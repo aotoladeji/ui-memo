@@ -37,10 +37,12 @@ export function TemplateSheet({ t, page, width }: { t: MemoTemplate; page: numbe
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', borderBottom: '3px double #000', fontSize: 12, minHeight: 88 }}>
               <div style={{ borderRight: '1px solid #000', padding: '6px 10px 10px 4px' }}>
                 <p style={{ margin: 0 }}><b>FROM</b>: {t.from_name}{t.from_staff_no ? ` (${t.from_staff_no})` : ''}</p>
-                {t.thru.trim() && <p style={{ margin: '12px 0 0' }}><b>THRU</b>: {t.thru}</p>}
                 <p style={{ margin: '12px 0 0' }}><b>DATE</b>: {formatDate(t.date)}</p>
               </div>
-              <div style={{ padding: '6px 4px 10px 12px' }}><p style={{ margin: 0 }}><b>TO</b>: {t.to}</p></div>
+              <div style={{ padding: '6px 4px 10px 12px' }}>
+                <p style={{ margin: 0 }}><b>TO</b>: {t.to}</p>
+                {t.thru.trim() && <p style={{ margin: '12px 0 0' }}><b>THRU</b>: {t.thru}</p>}
+              </div>
             </div>
 
             {t.subject && <p style={{ fontSize: 13, fontWeight: 700, margin: '18px 0 12px', textAlign: 'center' }}>{t.subject}</p>}

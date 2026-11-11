@@ -37,7 +37,9 @@ function memoShow(c: Ctx) {
   const row = db.recipients.filter((r) => r.memo_id === id && r.user_id === me.id && r.route_id === route.id)[0];
   if (row && !row.read_at) { row.read_at = new Date().toISOString(); persist(db); }
   const doc = db.docs.find((d) => d.memo_id === id)!;
-  const authorIds = new Set([...v.notes.map((n) => n.author_id), ...v.replies.map((r) => r.author_id), ...v.annotations.map((a) => a.author_id)]);
+  const minutes = db.minutes.filter((m) => m.memo_id === id);
+  const minuteReplies = db.minuteReplies.filter((r) => minutes.some((m) => m.id === r.minute_id));
+  const authorIds = new Set([...v.notes.map((n) => n.author_id), ...v.replies.map((r) => r.author_id), ...v.annotations.map((a) => a.author_id), ...minutes.map((m) => m.author_id), ...minuteReplies.map((r) => r.author_id)]);
   const authors = Object.fromEntries(db.users.filter((u) => authorIds.has(u.id)).map((u) => [u.id, { id: u.id, name: u.name, title: u.title, is_executive: u.is_executive }]));
   return ok({
     memo: { id: memo!.id, ref_no: memo!.ref_no, subject: memo!.subject, priority: memo!.priority, status: memo!.status, routing_type: memo!.routing_type, created_by: memo!.created_by },
@@ -50,7 +52,7 @@ function memoShow(c: Ctx) {
       kind: doc.kind,
       template: doc.kind === 'template' ? doc.template : undefined
     },
-    annotations: v.annotations, notes: v.notes, replies: v.replies, authors,
+    annotations: v.annotations, notes: v.notes, replies: v.replies, minutes, minuteReplies, authors,
   });
 }
 
@@ -323,6 +325,42 @@ on('post', '/notes/:id/replies', (c) => {
   val(c, { body: 'Write a reply.' });
   const rp = { id: nextId(c.db, 'replies'), note_id: n.id, origin_route_id: route.id, author_id: me.id, body: String(c.body.body), created_at: new Date().toISOString() };
   c.db.replies.push(rp); persist(c.db); return created(rp);
+});
+on('post', '/minutes', (c) => {
+  const me = need(c); const id = Number(c.body.memo_id); const route = viewerRoute(c, id, routeIdOf(c));
+  const b = c.body;
+  const m = { 
+    id: nextId(c.db, 'minutes'), 
+    memo_id: id, 
+    origin_route_id: route.id, 
+    author_id: me.id, 
+    page_number: Number(b.page_number), 
+    x: Number(b.x), 
+    y: Number(b.y), 
+    body: String(b.body), 
+    color: b.color ?? '#E0E7FF',
+    classification: b.classification ?? 'standard',
+    created_at: new Date().toISOString()
+  };
+  c.db.minutes.push(m); 
+  persist(c.db); 
+  return created(m);
+});
+on('post', '/minutes/:id/replies', (c) => {
+  const me = need(c); const m = c.db.minutes.find((x) => x.id === Number(c.params.id));
+  if (!m) throw new HttpError(404, 'Not found.');
+  val(c, { body: 'Write a reply.' });
+  const rp = { 
+    id: nextId(c.db, 'minuteReplies'), 
+    minute_id: m.id, 
+    origin_route_id: m.origin_route_id, 
+    author_id: me.id, 
+    body: String(c.body.body), 
+    created_at: new Date().toISOString() 
+  };
+  c.db.minuteReplies.push(rp); 
+  persist(c.db); 
+  return created(rp);
 });
 on('post', '/memos/:id/forward', (c) => forward(c, false));
 on('post', '/memos/:id/forward-preview', (c) => forward(c, true));

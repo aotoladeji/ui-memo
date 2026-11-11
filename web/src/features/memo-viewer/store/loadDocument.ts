@@ -12,14 +12,25 @@ export interface LoadedDoc {
 /** Loads a memo's original (PDF or image) through the authenticated file endpoint. */
 export async function loadDocument(url: string, mime: string, hint: PageDim[] | null): Promise<LoadedDoc> {
   const res = await api.get<ArrayBuffer>(url.replace(/^.*\/api\/v1/, ''), { responseType: 'arraybuffer' });
+  
+  // Clone the ArrayBuffer to prevent detachment issues
+  const buffer = res.data instanceof ArrayBuffer ? res.data.slice(0) : res.data;
 
   if (mime === 'application/pdf') {
-    const pdf = await pdfjs.getDocument({ data: new Uint8Array(res.data) }).promise;
-    const dims: PageDim[] = [];
-    for (let i = 1; i <= pdf.numPages; i++) {
-      const vp = (await pdf.getPage(i)).getViewport({ scale: 1 });
-      dims.push({ w: vp.width, h: vp.height });
-    }
+    const pdf = await pdfjs.getDocument({ data: new Uint8Array(buffer) }).promise;
+    
+    // Use hint dimensions if available (much faster!) - no need to load every page upfront
+    const dims: PageDim[] = hint && hint.length === pdf.numPages 
+      ? hint 
+      : await (async () => {
+          const d: PageDim[] = [];
+          for (let i = 1; i <= pdf.numPages; i++) {
+            const vp = (await pdf.getPage(i)).getViewport({ scale: 1 });
+            d.push({ w: vp.width, h: vp.height });
+          }
+          return d;
+        })();
+    
     return {
       pageCount: pdf.numPages, dims,
       render: async (n, canvas, cssWidth) => {
@@ -34,7 +45,7 @@ export async function loadDocument(url: string, mime: string, hint: PageDim[] | 
     };
   }
 
-  const bitmap = await createImageBitmap(new Blob([res.data], { type: mime }));
+  const bitmap = await createImageBitmap(new Blob([buffer], { type: mime }));
   const w = hint?.[0]?.w ?? Math.min(bitmap.width, 794);
   const h = hint?.[0]?.h ?? (bitmap.height / bitmap.width) * w;
   return {

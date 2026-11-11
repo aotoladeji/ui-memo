@@ -31,13 +31,18 @@ export function NoteThreadPanel() {
 }
 
 function Thread({ note }: { note: Note }) {
-  const { activeNoteId, setActive, replies, authors, addReply, upsertNote, readOnly, routeId } = useEditorShallow((s) => ({
-    activeNoteId: s.activeNoteId, setActive: s.setActive, replies: s.replies[note.id] ?? EMPTY, authors: s.authors,
-    addReply: s.addReply, upsertNote: s.upsertNote, readOnly: s.readOnly, routeId: s.routeId }));
+  const activeNoteId = useEditor((s) => s.activeNoteId);
+  const setActive = useEditor((s) => s.setActive);
+  const replies = useEditor((s) => s.replies[note.id] ?? EMPTY);
+  const author = useEditor((s) => s.authors[note.author_id]);
+  const authors = useEditor((s) => s.authors, (a, b) => a === b);
+  const addReply = useEditor((s) => s.addReply);
+  const upsertNote = useEditor((s) => s.upsertNote);
+  const readOnly = useEditor((s) => s.readOnly);
+  const routeId = useEditor((s) => s.routeId);
   const me = useAuth((s) => s.me)!;
   const [text, setText] = useState(''); const [err, setErr] = useState('');
   const [collapsed, setCollapsed] = useState(false);
-  const author = authors[note.author_id];
   const active = activeNoteId === note.id;
   const open = note.requires_action && note.status === 'open';
 

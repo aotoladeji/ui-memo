@@ -88,7 +88,16 @@ export function DrawLayer({ page, pageW, pageH, scale }: { page: number; pageW: 
       c.on('mouse:down', (e) => {
         if (e.target) return;
         const p = c.getScenePoint(e.e); let obj: fabric.FabricObject;
-        if (tool === 'text') obj = new fabric.IText('Type here', { left: p.x, top: p.y, fontSize: 16, fill: color, fontFamily: 'sans-serif' });
+        if (tool === 'text') {
+          obj = new fabric.IText('Type here', { left: p.x, top: p.y, fontSize: 16, fill: color, fontFamily: 'sans-serif' });
+          c.add(obj); 
+          c.setActiveObject(obj); 
+          // Enter edit mode immediately for text tool
+          (obj as fabric.IText).enterEditing();
+          (obj as fabric.IText).selectAll();
+          c.fire('object:modified', { target: obj } as any);
+          return;
+        }
         else if (tool === 'signature') obj = new fabric.IText(me.name, { left: p.x, top: p.y, fontSize: 28, fontStyle: 'italic', fontFamily: 'cursive', fill: '#1E1B3A' });
         else {
           const r = new fabric.Rect({ width: 150, height: 44, fill: 'rgba(0,0,0,0)', stroke: '#7C3AED', strokeWidth: 3, rx: 6, ry: 6 });

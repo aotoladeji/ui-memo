@@ -11,14 +11,16 @@ export interface DRecipient { id: number; memo_id: number; route_id: number; use
 export interface DAnn { id: number; memo_id: number; origin_route_id: number; author_id: number; page_number: number; tool: string; geometry: unknown; style: unknown; classification: Cls; visibility_scope: 'chain' | 'private'; z_index: number }
 export interface DNote { id: number; memo_id: number; origin_route_id: number; author_id: number; page_number: number; x: number; y: number; body: string; color: string; classification: Cls; visibility_scope: 'chain' | 'private'; requires_action: boolean; assigned_to: number | null; status: 'open' | 'resolved' }
 export interface DReply { id: number; note_id: number; origin_route_id: number; author_id: number; body: string; created_at: string }
+export interface DMinute { id: number; memo_id: number; origin_route_id: number; author_id: number; page_number: number; x: number; y: number; body: string; color: string; classification: Cls; created_at: string }
+export interface DMinuteReply { id: number; minute_id: number; origin_route_id: number; author_id: number; body: string; created_at: string }
 export interface DRule { route_id: number; target_type: 'sticky_note' | 'annotation'; target_id: number; effect: 'include' | 'exclude' }
 export interface DB {
   seq: Record<string, number>;
   faculties: { id: number; name: string; code: string }[]; departments: { id: number; faculty_id: number; name: string; code: string }[]; units: { id: number; department_id: number; name: string; code: string }[];
-  users: DUser[]; memos: DMemo[]; docs: DDoc[]; routes: DRoute[]; recipients: DRecipient[]; annotations: DAnn[]; notes: DNote[]; replies: DReply[]; rules: DRule[];
+  users: DUser[]; memos: DMemo[]; docs: DDoc[]; routes: DRoute[]; recipients: DRecipient[]; annotations: DAnn[]; notes: DNote[]; replies: DReply[]; minutes: DMinute[]; minuteReplies: DMinuteReply[]; rules: DRule[];
 }
 
-const KEY = 'ui_memo_mock_db_v1';
+const KEY = 'ui_memo_mock_db_v2';
 export const files = new Map<string, ArrayBuffer>();   // uploaded originals live in memory for the session
 
 export function nextId(db: DB, table: string): number { db.seq[table] = (db.seq[table] ?? 0) + 1; return db.seq[table]; }
@@ -39,7 +41,7 @@ function seed(): DB {
       u(5, 'ST001', 'Ada Okafor', 'staff', 2, 'Systems Officer'),
       u(6, 'ST002', 'Tunde Bello', 'staff', 2, 'Network Engineer'),
     ],
-    memos: [], docs: [], routes: [], recipients: [], annotations: [], notes: [], replies: [], rules: [],
+    memos: [], docs: [], routes: [], recipients: [], annotations: [], notes: [], replies: [], minutes: [], minuteReplies: [], rules: [],
   };
   const now = new Date().toISOString();
   const mk = (subject: string, by: number, to: number[], body: string[]) => {
@@ -69,6 +71,10 @@ function load(): DB {
 }
 /** Seed PDFs are regenerated after a reload; uploaded files (memory only) fall back to a placeholder. */
 function ensureFiles(d: DB) {
+  // Ensure new fields exist for databases saved before minutes feature
+  if (!d.minutes) d.minutes = [];
+  if (!d.minuteReplies) d.minuteReplies = [];
+  
   for (const doc of d.docs) {
     if (files.has(doc.file_key)) continue;
     const m = d.memos.find((x) => x.id === doc.memo_id)!;

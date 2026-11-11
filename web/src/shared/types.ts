@@ -6,10 +6,16 @@ export interface Me {
   unit_id: number | null; is_executive: boolean; can_send_global_broadcast: boolean;
 }
 export interface Reply { id: number; note_id: number; author_id: number; body: string; created_at: string }
+export interface MinuteReply { id: number; minute_id: number; author_id: number; body: string; created_at: string }
 export interface Note {
   id: number; memo_id: number; page_number: number; x: number; y: number; body: string;
   classification: Classification; requires_action: boolean; status: 'open' | 'resolved';
   author_id: number; assigned_to: number | null; color: string;
+}
+export interface Minute {
+  id: number; memo_id: number; page_number: number; x: number; y: number; 
+  body: string; classification: Classification;
+  author_id: number; created_at: string; color: string;
 }
 export interface Ann {
   id: string;                 // client id (stable); server id kept separately
@@ -23,7 +29,7 @@ export interface MemoView {
   route: { id: number; kind: 'origin' | 'forward'; depth: number };
   document: { url: string | null; mime: string; page_count: number; page_dims: PageDim[] | null; kind?: 'template' | 'file'; template?: any };
   annotations: { id: number; page_number: number; tool: string; geometry: unknown; style: unknown; classification: Classification; author_id: number }[];
-  notes: Note[]; replies: Reply[]; authors: Record<string, AuthorInfo>;
+  notes: Note[]; replies: Reply[]; minutes: Minute[]; minuteReplies: MinuteReply[]; authors: Record<string, AuthorInfo>;
 }
 export interface UserLite { id: number; name: string; title?: string | null }
 export interface ForwardPayload {

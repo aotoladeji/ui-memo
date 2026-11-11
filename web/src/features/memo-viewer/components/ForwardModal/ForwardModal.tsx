@@ -14,8 +14,12 @@ interface Preview { notes: { id: number }[]; annotations: { id: number }[]; repl
 
 export function ForwardModal({ open, onClose, onForwarded }: ForwardModalProps) {
   const me = useAuth((s) => s.me)!;
-  const { memoId, routeId, authors, notes, replies, annCount } = useEditorShallow((s) => ({
-    memoId: s.memoId, routeId: s.routeId, authors: s.authors, notes: s.notes, replies: s.replies, annCount: Object.keys(s.annotations).length }));
+  const memoId = useEditor((s) => s.memoId);
+  const routeId = useEditor((s) => s.routeId);
+  const authors = useEditor((s) => s.authors, (a, b) => a === b);
+  const notes = useEditor((s) => s.notes, (a, b) => a === b);
+  const replies = useEditor((s) => s.replies, (a, b) => a === b);
+  const annCount = useEditor((s) => Object.keys(s.annotations).length);
   const noteList = useMemo(() => Object.values(notes).sort((a, b) => a.page_number - b.page_number), [notes]);
   const replyCounts = useMemo(() => Object.fromEntries(Object.entries(replies).map(([k, v]) => [Number(k), v.length])), [replies]);
   const execCount = noteList.filter((n) => n.classification === 'executive').length;
