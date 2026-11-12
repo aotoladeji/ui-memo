@@ -77,9 +77,23 @@ export default function ComposePage() {
           } })).data.id;
       } else {
         if (!file) return;
-        const m = await measureFile(file); const fd = new FormData();
-        fd.append('subject', f.subject); fd.append('routing_type', routing); fd.append('priority', priority); fd.append('file', file); fd.append('page_count', String(m.pageCount));
-        m.dims.forEach((d, i) => { fd.append(`page_dims[${i}][w]`, String(d.w)); fd.append(`page_dims[${i}][h]`, String(d.h)); });
+        const m = await measureFile(file); 
+        const fd = new FormData();
+        fd.append('subject', f.subject); 
+        fd.append('routing_type', routing); 
+        fd.append('priority', priority); 
+        fd.append('file', file); 
+        
+        // Only include dimensions if client-side measurement succeeded
+        // For Word docs, backend will determine dimensions after conversion
+        if (m) {
+          fd.append('page_count', String(m.pageCount));
+          m.dims.forEach((d, i) => { 
+            fd.append(`page_dims[${i}][w]`, String(d.w)); 
+            fd.append(`page_dims[${i}][h]`, String(d.h)); 
+          });
+        }
+        
         id = (await api.post('/memos', fd)).data.id;
       }
       nav(`/memos/${id}`);

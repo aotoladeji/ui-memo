@@ -60,8 +60,17 @@ export async function loadDocument(url: string, mime: string, hint: PageDim[] | 
 }
 
 /** Used by the compose page to measure pages before upload. */
-export async function measureFile(file: File): Promise<{ pageCount: number; dims: PageDim[] }> {
-  if (file.type !== 'application/pdf') {
+export async function measureFile(file: File): Promise<{ pageCount: number; dims: PageDim[] } | null> {
+  // Word documents and other non-PDF/image files cannot be measured client-side
+  // Return null to indicate backend should handle dimensions
+  const isImage = file.type.startsWith('image/');
+  const isPdf = file.type === 'application/pdf';
+  
+  if (!isImage && !isPdf) {
+    return null; // Backend will process Word docs and determine dimensions
+  }
+  
+  if (!isPdf) {
     const bmp = await createImageBitmap(file);
     const w = Math.min(bmp.width, 794);
     return { pageCount: 1, dims: [{ w, h: (bmp.height / bmp.width) * w }] };
