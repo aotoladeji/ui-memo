@@ -41,7 +41,11 @@ export function TemplateSheet({ t, page, width }: { t: MemoTemplate; page: numbe
               </div>
               <div style={{ padding: '6px 4px 10px 12px' }}>
                 <p style={{ margin: 0 }}><b>TO</b>: {t.to}</p>
-                {t.thru.trim() && <p style={{ margin: '12px 0 0' }}><b>THRU</b>: {t.thru}</p>}
+                {t.thru && t.thru.length > 0 && t.thru.map((thruItem, idx) => (
+                  <p key={idx} style={{ margin: '12px 0 0' }}>
+                    <b>THRU</b>: {thruItem}
+                  </p>
+                ))}
               </div>
             </div>
 

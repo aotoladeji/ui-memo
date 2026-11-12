@@ -24,7 +24,7 @@ export default function ComposePage() {
   const [f, setF] = useState<TemplateFields>({ 
     subject: '', 
     to: '', 
-    thru: '', 
+    thru: [],  // Changed to empty array
     date: todayIso(), 
     office_line: '', 
     body: '',

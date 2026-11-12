@@ -3,13 +3,14 @@ import { StaffAutocomplete } from './StaffAutocomplete';
 import { TableBuilder } from './TableBuilder';
 import { useRef } from 'react';
 
-export type TemplateFields = Pick<MemoTemplate, 'to' | 'thru' | 'date' | 'office_line' | 'body'> & { 
+export type TemplateFields = Omit<Pick<MemoTemplate, 'to' | 'thru' | 'date' | 'office_line' | 'body'>, 'thru'> & { 
   subject: string;
   from_name: string;
   from_staff_no: string;
   signature_name: string;
   signature_title: string;
   signature_unit: string;
+  thru: string[];
 };
 
 /** The editable parts of the template. Department, logos, lines and the university name are fixed. */
@@ -57,12 +58,43 @@ export function TemplateForm({ value, onChange }: { value: TemplateFields; onCha
           placeholder="e.g. The Deputy Director, MIS"
           required
         />
-        <StaffAutocomplete
-          label="Thru (optional)"
-          value={value.thru}
-          onChange={(v) => set('thru', v)}
-          placeholder="Leave empty if not needed"
-        />
+        <div>
+          <label className="block text-sm font-bold mb-1">Thru (optional)</label>
+          <div className="space-y-2">
+            {value.thru.map((thruItem, idx) => (
+              <div key={idx} className="flex gap-2">
+                <StaffAutocomplete
+                  label=""
+                  value={thruItem}
+                  onChange={(v) => {
+                    const newThru = [...value.thru];
+                    newThru[idx] = v;
+                    set('thru', newThru);
+                  }}
+                  placeholder={idx === 0 ? "e.g. The Head of Department" : "Additional thru"}
+                />
+                <button
+                  type="button"
+                  className="btn btn-ghost px-2"
+                  onClick={() => {
+                    const newThru = value.thru.filter((_, i) => i !== idx);
+                    set('thru', newThru);
+                  }}
+                  title="Remove this thru"
+                >
+                  ×
+                </button>
+              </div>
+            ))}
+            <button
+              type="button"
+              className="btn btn-ghost text-sm w-full"
+              onClick={() => set('thru', [...value.thru, ''])}
+            >
+              + Add Thru
+            </button>
+          </div>
+        </div>
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2">

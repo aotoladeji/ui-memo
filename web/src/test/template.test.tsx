@@ -33,15 +33,15 @@ describe('template memo API (mock mirrors Laravel)', () => {
     const id = (await create({ from_name: 'Someone Else', department_name: 'Fake Dept' })).data.id;
     const doc = (await api.get(`/memos/${id}`)).data.document;
     expect(doc.kind).toBe('template');
-    expect(doc.template).toMatchObject({ from_name: 'Ada Okafor', from_staff_no: 'ST001', department_name: 'Computer Science', thru: '', subject: 'Request for access', signature: { name: 'Ada Okafor', title: 'Systems Officer', unit: 'ICT Unit' } });
+    expect(doc.template).toMatchObject({ from_name: 'Ada Okafor', from_staff_no: 'ST001', department_name: 'Computer Science', thru: [], subject: 'Request for access', signature: { name: 'Ada Okafor', title: 'Systems Officer', unit: 'ICT Unit' } });
   });
 
   it('requires To and a valid date; THRU is optional', async () => {
     await as('st001@ui.edu.ng');
     await expect(create({ to: '' })).rejects.toMatchObject({ response: { status: 422 } });
     await expect(create({ date: 'yesterday' })).rejects.toMatchObject({ response: { status: 422 } });
-    const id = (await create({ thru: 'The Director' })).data.id;
-    expect((await api.get(`/memos/${id}`)).data.document.template.thru).toBe('The Director');
+    const id = (await create({ thru: ['The Director'] })).data.id;
+    expect((await api.get(`/memos/${id}`)).data.document.template.thru).toEqual(['The Director']);
   });
 
   it('rejects the template for accounts with no unit', async () => {
@@ -52,9 +52,9 @@ describe('template memo API (mock mirrors Laravel)', () => {
   it('lets the author edit a draft, but not after sending and not other people', async () => {
     await as('st001@ui.edu.ng');
     const id = (await create()).data.id;
-    await api.patch(`/memos/${id}/template`, { subject: 'New subject', page_count: 1, template: tpl({ thru: 'The Director', body: 'Updated.' }) });
+    await api.patch(`/memos/${id}/template`, { subject: 'New subject', page_count: 1, template: tpl({ thru: ['The Director'], body: 'Updated.' }) });
     const d = (await api.get(`/memos/${id}`)).data.document.template;
-    expect(d).toMatchObject({ subject: 'New subject', thru: 'The Director', body: 'Updated.' });
+    expect(d).toMatchObject({ subject: 'New subject', thru: ['The Director'], body: 'Updated.' });
     await api.post(`/memos/${id}/send`, { recipient_ids: [4] });
     await expect(api.patch(`/memos/${id}/template`, { subject: 'x', template: tpl() })).rejects.toMatchObject({ response: { status: 403 } });
     await as('hd001@ui.edu.ng');
@@ -103,7 +103,7 @@ describe('department logo', () => {
 });
 
 const base: MemoTemplate = { v: 1, department_id: 1, department_name: 'Management Information System [MIS] Unit', office_line: 'Office of the Assistant Director', from_name: 'A.O. Oladeji', from_staff_no: 'PF-28559',
-  to: 'The Deputy Director, MIS', thru: '', date: '2026-06-25', subject: 'Request for After-Hours Access', body: 'First paragraph.\n\nSecond paragraph.', signature: { name: 'A.O. Oladeji', title: 'Network Administrator', unit: 'MIS/ITeMS' } };
+  to: 'The Deputy Director, MIS', thru: [], date: '2026-06-25', subject: 'Request for After-Hours Access', body: 'First paragraph.\n\nSecond paragraph.', signature: { name: 'A.O. Oladeji', title: 'Network Administrator', unit: 'MIS/ITeMS' } };
 const wrap = (ui: React.ReactNode) => render(<QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>{ui}</QueryClientProvider>);
 
 describe('TemplateSheet', () => {
@@ -125,7 +125,7 @@ describe('TemplateSheet', () => {
 
   it('shows THRU only when filled, and a placeholder when the department has no logo', async () => {
     await as('st001@ui.edu.ng');
-    wrap(<TemplateSheet t={{ ...base, thru: 'The Director, MIS', office_line: '' }} page={1} width={595} />);
+    wrap(<TemplateSheet t={{ ...base, thru: ['The Director, MIS'], office_line: '' }} page={1} width={595} />);
     expect(screen.getByText('The Director, MIS', { exact: false })).toBeTruthy();
     expect(screen.getByText('THRU')).toBeTruthy();
     expect(screen.queryByText('Office of the Assistant Director')).toBeNull();

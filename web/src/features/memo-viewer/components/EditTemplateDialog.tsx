@@ -6,13 +6,41 @@ import { TemplateFields, TemplateForm } from '@/features/memo-template/TemplateF
 
 /** Edit the text of a draft template memo. Header, FROM and logos stay fixed. */
 export function EditTemplateDialog({ open, onClose, memoId, template, onSaved }: { open: boolean; onClose: () => void; memoId: number; template: MemoTemplate; onSaved: () => void }) {
-  const [f, setF] = useState<TemplateFields>({ subject: template.subject, to: template.to, thru: template.thru, date: template.date, office_line: template.office_line, body: template.body });
+  const [f, setF] = useState<TemplateFields>({ 
+    subject: template.subject, 
+    to: template.to, 
+    thru: template.thru, 
+    date: template.date, 
+    office_line: template.office_line, 
+    body: template.body,
+    from_name: template.from_name,
+    from_staff_no: template.from_staff_no,
+    signature_name: template.signature.name,
+    signature_title: template.signature.title,
+    signature_unit: template.signature.unit
+  });
   const [err, setErr] = useState(''); const [busy, setBusy] = useState(false);
   const save = async () => {
     setBusy(true); setErr('');
     try {
       const n = templatePageCount(f.body);
-      await api.patch(`/memos/${memoId}/template`, { subject: f.subject, page_count: n, page_dims: pageDims(n), template: { to: f.to, thru: f.thru, date: f.date, office_line: f.office_line, body: f.body } });
+      await api.patch(`/memos/${memoId}/template`, { 
+        subject: f.subject, 
+        page_count: n, 
+        page_dims: pageDims(n), 
+        template: { 
+          to: f.to, 
+          thru: f.thru, 
+          date: f.date, 
+          office_line: f.office_line, 
+          body: f.body,
+          from_name: f.from_name,
+          from_staff_no: f.from_staff_no,
+          signature_name: f.signature_name,
+          signature_title: f.signature_title,
+          signature_unit: f.signature_unit
+        } 
+      });
       onSaved(); onClose();
     } catch (e) { setErr(errorText(e)); } finally { setBusy(false); }
   };

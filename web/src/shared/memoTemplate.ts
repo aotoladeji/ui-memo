@@ -11,7 +11,7 @@ export interface MemoTemplate {
   from_name: string;            // preset from the sender's account
   from_staff_no: string;
   to: string;
-  thru: string;                 // optional
+  thru: string[];               // array of thru recipients, each on separate line
   date: string;                 // ISO yyyy-mm-dd
   subject: string;
   body: string;

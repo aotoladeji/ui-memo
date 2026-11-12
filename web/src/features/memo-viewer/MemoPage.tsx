@@ -39,7 +39,7 @@ export default function MemoPage() {
       from_name: t.from_name || '',
       from_staff_no: t.from_staff_no || '',
       to: t.to || '',
-      thru: t.thru || '',
+      thru: t.thru || [],
       date: t.date || '',
       subject: data.memo.subject,
       body: t.body || '',
