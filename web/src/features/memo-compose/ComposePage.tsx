@@ -98,7 +98,7 @@ export default function ComposePage() {
       <h1 className="mb-4 text-xl font-bold">New memo</h1>
       <div role="tablist" aria-label="Memo format" className="mb-5 flex flex-col gap-3 sm:flex-row">
         {tab('template', 'Use the university memo template', 'Official letterhead. Write the text; the header is filled in for you.', FileText)}
-        {tab('upload', 'Upload a document', 'PDF or image (up to 20 MB).', Upload)}
+        {tab('upload', 'Upload a document', 'PDF, Word (.doc, .docx), or image (up to 20 MB).', Upload)}
       </div>
 
       <div className={`grid gap-6 ${mode === 'template' ? 'lg:grid-cols-[minmax(0,1fr)_420px]' : 'max-w-xl'}`}>
@@ -106,8 +106,8 @@ export default function ComposePage() {
           {mode === 'template' ? <TemplateForm value={f} onChange={setF} /> : (
             <>
               <label className="block text-sm font-bold">Subject<input className="field mt-1" value={f.subject} onChange={(e) => setF({ ...f, subject: e.target.value })} required maxLength={255} /></label>
-              <label className="block text-sm font-bold">Document (PDF or image, up to 20 MB)
-                <input className="field mt-1" type="file" accept="application/pdf,image/png,image/jpeg" onChange={(e) => setFile(e.target.files?.[0] ?? null)} required /></label>
+              <label className="block text-sm font-bold">Document (PDF, Word, or image, up to 20 MB)
+                <input className="field mt-1" type="file" accept="application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,image/png,image/jpeg" onChange={(e) => setFile(e.target.files?.[0] ?? null)} required /></label>
             </>
           )}
           <div className="grid grid-cols-2 gap-3">
