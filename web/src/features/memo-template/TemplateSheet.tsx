@@ -8,8 +8,9 @@ const SANS = "Calibri, 'Segoe UI', Arial, sans-serif";
  * One A4 page of the University of Ibadan memo template, drawn at 595x842 and scaled to `width`.
  * Fixed: university name, university logo, INTERNAL MEMORANDUM, FROM/TO/DATE layout, divider lines.
  * Preset: department name and logo, FROM. Optional: THRU, office line.
+ * @param viewerUnitName - If provided, shows checkmark next to CC items matching this unit name
  */
-export function TemplateSheet({ t, page, width }: { t: MemoTemplate; page: number; width: number }) {
+export function TemplateSheet({ t, page, width, viewerUnitName }: { t: MemoTemplate; page: number; width: number; viewerUnitName?: string | null }) {
   const pages = paginate(t.body);
   const first = page === 1, last = page === pages.length;
   const deptLogo = useDepartmentLogo(t.department_id, first);
@@ -117,9 +118,16 @@ export function TemplateSheet({ t, page, width }: { t: MemoTemplate; page: numbe
             {t.cc && t.cc.length > 0 && (
               <div style={{ marginTop: 24, fontSize: 11, lineHeight: '16px' }}>
                 <p style={{ margin: 0, fontWeight: 700 }}>CC:</p>
-                {t.cc.map((ccItem, idx) => (
-                  <p key={idx} style={{ margin: '4px 0 0', paddingLeft: 8 }}>{ccItem}</p>
-                ))}
+                {t.cc.map((ccItem, idx) => {
+                  // Check if this CC item matches the viewer's unit
+                  const isViewerUnit = viewerUnitName && ccItem.toLowerCase().includes(viewerUnitName.toLowerCase());
+                  return (
+                    <p key={idx} style={{ margin: '4px 0 0', paddingLeft: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
+                      {isViewerUnit && <span style={{ fontSize: 14, fontWeight: 700 }}>✓</span>}
+                      {ccItem}
+                    </p>
+                  );
+                })}
               </div>
             )}
           </>

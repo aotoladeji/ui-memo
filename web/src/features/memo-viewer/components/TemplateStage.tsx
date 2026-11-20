@@ -7,7 +7,7 @@ import { NoteLayer } from './layers/NoteLayer';
 import { MinuteLayer } from './layers/MinuteLayer';
 
 /** Template memo viewer with annotation support */
-export function TemplateStage({ template, refNo }: { template: MemoTemplate; refNo?: string }) {
+export function TemplateStage({ template, refNo, viewerUnitName }: { template: MemoTemplate; refNo?: string; viewerUnitName?: string | null }) {
   const scale = useEditor((s) => s.scale);
   const pages = paginate(template.body);
   const timestamp = new Date().toLocaleString();
@@ -15,13 +15,13 @@ export function TemplateStage({ template, refNo }: { template: MemoTemplate; ref
   return (
     <div className="flex-1 overflow-auto bg-surface-deep p-4">
       {pages.map((_, i) => (
-        <TemplatePageFrame key={i} template={template} page={i + 1} scale={scale} refNo={refNo} timestamp={timestamp} />
+        <TemplatePageFrame key={i} template={template} page={i + 1} scale={scale} refNo={refNo} timestamp={timestamp} viewerUnitName={viewerUnitName} />
       ))}
     </div>
   );
 }
 
-function TemplatePageFrame({ template, page, scale, refNo, timestamp }: { template: MemoTemplate; page: number; scale: number; refNo?: string; timestamp: string }) {
+function TemplatePageFrame({ template, page, scale, refNo, timestamp, viewerUnitName }: { template: MemoTemplate; page: number; scale: number; refNo?: string; timestamp: string; viewerUnitName?: string | null }) {
   const ref = useRef<HTMLDivElement>(null);
   const [near, setNear] = useState(page <= 2);
   
@@ -48,7 +48,7 @@ function TemplatePageFrame({ template, page, scale, refNo, timestamp }: { templa
         <>
           {/* Template content layer */}
           <div className="absolute inset-0 pointer-events-none">
-            <TemplateSheet t={template} page={page} width={W} />
+            <TemplateSheet t={template} page={page} width={W} viewerUnitName={viewerUnitName} />
           </div>
           
           {/* Annotation layers (same as PDF viewer) */}

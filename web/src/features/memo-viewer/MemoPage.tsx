@@ -148,7 +148,7 @@ export default function MemoPage() {
       <Toolbar />
       <div className="flex min-h-0 flex-1" data-memo-ref={data.memo.ref_no} data-memo-timestamp={new Date().toLocaleString()}>
         {isTemplate && templatePreview ? (
-          <TemplateStage template={templatePreview} refNo={data.memo.ref_no} />
+          <TemplateStage template={templatePreview} refNo={data.memo.ref_no} viewerUnitName={me.unit_name} />
         ) : (
           <DocumentStage doc={doc} refNo={data.memo.ref_no} />
         )}
