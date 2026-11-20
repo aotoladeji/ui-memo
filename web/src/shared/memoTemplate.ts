@@ -12,10 +12,12 @@ export interface MemoTemplate {
   from_staff_no: string;
   to: string;
   thru: string[];               // array of thru recipients, each on separate line
+  cc: string[];                 // carbon copy recipients, displayed on bottom left
   date: string;                 // ISO yyyy-mm-dd
   subject: string;
   body: string;
   signature: { name: string; title: string; unit: string };
+  reference_number?: string;    // optional reference number (e.g. UI/CODE/2024/0001)
 }
 
 export const todayIso = () => new Date().toISOString().slice(0, 10);

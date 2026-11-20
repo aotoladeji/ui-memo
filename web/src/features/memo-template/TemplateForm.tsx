@@ -3,7 +3,7 @@ import { StaffAutocomplete } from './StaffAutocomplete';
 import { TableBuilder } from './TableBuilder';
 import { useRef } from 'react';
 
-export type TemplateFields = Omit<Pick<MemoTemplate, 'to' | 'thru' | 'date' | 'office_line' | 'body'>, 'thru'> & { 
+export type TemplateFields = Omit<Pick<MemoTemplate, 'to' | 'thru' | 'cc' | 'date' | 'office_line' | 'body'>, 'thru' | 'cc'> & { 
   subject: string;
   from_name: string;
   from_staff_no: string;
@@ -11,6 +11,7 @@ export type TemplateFields = Omit<Pick<MemoTemplate, 'to' | 'thru' | 'date' | 'o
   signature_title: string;
   signature_unit: string;
   thru: string[];
+  cc: string[];
 };
 
 /** The editable parts of the template. Department, logos, lines and the university name are fixed. */
@@ -102,6 +103,44 @@ export function TemplateForm({ value, onChange }: { value: TemplateFields; onCha
           <input className="field mt-1" type="date" value={value.date} onChange={(e) => set('date', e.target.value)} required /></label>
         <label className="block text-sm font-bold">Office line <span className="font-normal text-ink-soft">(optional)</span>
           <input className="field mt-1" value={value.office_line} onChange={(e) => set('office_line', e.target.value)} maxLength={255} placeholder="e.g. Office of the Assistant Director" /></label>
+      </div>
+
+      <div>
+        <label className="block text-sm font-bold mb-1">CC (optional)</label>
+        <div className="space-y-2">
+          {value.cc.map((ccItem, idx) => (
+            <div key={idx} className="flex gap-2">
+              <StaffAutocomplete
+                label=""
+                value={ccItem}
+                onChange={(v) => {
+                  const newCc = [...value.cc];
+                  newCc[idx] = v;
+                  set('cc', newCc);
+                }}
+                placeholder={idx === 0 ? "e.g. The Registrar" : "Additional CC"}
+              />
+              <button
+                type="button"
+                className="btn btn-ghost px-2"
+                onClick={() => {
+                  const newCc = value.cc.filter((_, i) => i !== idx);
+                  set('cc', newCc);
+                }}
+                title="Remove this CC"
+              >
+                ×
+              </button>
+            </div>
+          ))}
+          <button
+            type="button"
+            className="btn btn-ghost text-sm w-full"
+            onClick={() => set('cc', [...value.cc, ''])}
+          >
+            + Add CC
+          </button>
+        </div>
       </div>
 
       <div>

@@ -9,7 +9,8 @@ export function EditTemplateDialog({ open, onClose, memoId, template, onSaved }:
   const [f, setF] = useState<TemplateFields>({ 
     subject: template.subject, 
     to: template.to, 
-    thru: template.thru, 
+    thru: template.thru,
+    cc: template.cc || [],
     date: template.date, 
     office_line: template.office_line, 
     body: template.body,
@@ -30,7 +31,8 @@ export function EditTemplateDialog({ open, onClose, memoId, template, onSaved }:
         page_dims: pageDims(n), 
         template: { 
           to: f.to, 
-          thru: f.thru, 
+          thru: f.thru,
+          cc: f.cc,
           date: f.date, 
           office_line: f.office_line, 
           body: f.body,

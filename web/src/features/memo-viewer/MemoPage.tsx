@@ -33,13 +33,14 @@ export default function MemoPage() {
     
     return {
       v: 1,
-      department_id: t.department_id ?? me.department_id ?? 1,
-      department_name: t.department_name ?? me.department_name ?? 'Department',
+      department_id: t.department_id ?? 1,
+      department_name: t.department_name ?? 'Department',
       office_line: t.office_line || '',
       from_name: t.from_name || '',
       from_staff_no: t.from_staff_no || '',
       to: t.to || '',
       thru: t.thru || [],
+      cc: t.cc || [],
       date: t.date || '',
       subject: data.memo.subject,
       body: t.body || '',
@@ -47,7 +48,8 @@ export default function MemoPage() {
         name: t.signature_name || '',
         title: t.signature_title || '',
         unit: t.signature_unit || ''
-      }
+      },
+      reference_number: t.reference_number
     };
   }, [data, me]);
 

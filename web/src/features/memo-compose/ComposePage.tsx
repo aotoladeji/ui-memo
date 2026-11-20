@@ -24,7 +24,8 @@ export default function ComposePage() {
   const [f, setF] = useState<TemplateFields>({ 
     subject: '', 
     to: '', 
-    thru: [],  // Changed to empty array
+    thru: [],
+    cc: [],
     date: todayIso(), 
     office_line: '', 
     body: '',
@@ -33,6 +34,11 @@ export default function ComposePage() {
     signature_name: me.name,
     signature_title: me.title || 'Staff Member',
     signature_unit: me.unit_name || 'ICT Unit'
+  });
+  const [referenceNumber, setReferenceNumber] = useState(() => {
+    const year = new Date().getFullYear();
+    const seq = String(Math.floor(Math.random() * 9999) + 1).padStart(4, '0');
+    return `UI/CODE/${year}/${seq}`;
   });
   const [file, setFile] = useState<File | null>(null);
   const [err, setErr] = useState(''); const [busy, setBusy] = useState(false);
@@ -46,12 +52,14 @@ export default function ComposePage() {
     from_name: f.from_name, 
     from_staff_no: f.from_staff_no, 
     to: f.to, 
-    thru: f.thru, 
+    thru: f.thru,
+    cc: f.cc,
     date: f.date, 
     subject: f.subject, 
     body: f.body,
     signature: { name: f.signature_name, title: f.signature_title, unit: f.signature_unit },
-  }), [f, me]);
+    reference_number: referenceNumber,
+  }), [f, me, referenceNumber]);
   const pages = paginate(f.body).length;
 
   const submit = async (e: FormEvent) => {
@@ -65,7 +73,8 @@ export default function ComposePage() {
             department_id: me.department_id ?? 1,
             department_name: me.department_name || 'Computer Science',
             to: f.to, 
-            thru: f.thru, 
+            thru: f.thru,
+            cc: f.cc,
             date: f.date, 
             office_line: f.office_line, 
             body: f.body,
@@ -73,7 +82,8 @@ export default function ComposePage() {
             from_staff_no: f.from_staff_no,
             signature_name: f.signature_name,
             signature_title: f.signature_title,
-            signature_unit: f.signature_unit
+            signature_unit: f.signature_unit,
+            reference_number: referenceNumber
           } })).data.id;
       } else {
         if (!file) return;
@@ -117,11 +127,30 @@ export default function ComposePage() {
 
       <div className={`grid gap-6 ${mode === 'template' ? 'lg:grid-cols-[minmax(0,1fr)_420px]' : 'max-w-xl'}`}>
         <div className="card space-y-4 p-5">
-          {mode === 'template' ? <TemplateForm value={f} onChange={setF} /> : (
+          {mode === 'template' ? (
+            <>
+              <label className="block text-sm font-bold">Reference Number
+                <input className="field mt-1" value={referenceNumber} onChange={(e) => setReferenceNumber(e.target.value)} maxLength={50} placeholder="e.g. UI/CODE/2024/0001" />
+                <span className="text-xs text-ink-soft">Auto-generated, but you can customize it</span>
+              </label>
+              <TemplateForm value={f} onChange={setF} />
+            </>
+          ) : (
             <>
               <label className="block text-sm font-bold">Subject<input className="field mt-1" value={f.subject} onChange={(e) => setF({ ...f, subject: e.target.value })} required maxLength={255} /></label>
               <label className="block text-sm font-bold">Document (PDF, Word, or image, up to 20 MB)
                 <input className="field mt-1" type="file" accept="application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,image/png,image/jpeg" onChange={(e) => setFile(e.target.files?.[0] ?? null)} required /></label>
+              <div className="rounded-lg border border-blue-200 bg-blue-50 p-4">
+                <div className="flex items-start gap-3">
+                  <div className="rounded-full bg-blue-600 px-2 py-1 text-xs font-bold text-white">
+                    ✓ EDITABLE
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-sm font-bold text-blue-900">Document will be editable after upload</p>
+                    <p className="text-xs text-blue-700 mt-1">You'll be able to annotate, mark up, and add notes directly on the document in the viewer.</p>
+                  </div>
+                </div>
+              </div>
             </>
           )}
           <div className="grid grid-cols-2 gap-3">

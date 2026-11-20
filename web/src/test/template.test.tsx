@@ -103,7 +103,7 @@ describe('department logo', () => {
 });
 
 const base: MemoTemplate = { v: 1, department_id: 1, department_name: 'Management Information System [MIS] Unit', office_line: 'Office of the Assistant Director', from_name: 'A.O. Oladeji', from_staff_no: 'PF-28559',
-  to: 'The Deputy Director, MIS', thru: [], date: '2026-06-25', subject: 'Request for After-Hours Access', body: 'First paragraph.\n\nSecond paragraph.', signature: { name: 'A.O. Oladeji', title: 'Network Administrator', unit: 'MIS/ITeMS' } };
+  to: 'The Deputy Director, MIS', thru: [], cc: [], date: '2026-06-25', subject: 'Request for After-Hours Access', body: 'First paragraph.\n\nSecond paragraph.', signature: { name: 'A.O. Oladeji', title: 'Network Administrator', unit: 'MIS/ITeMS' } };
 const wrap = (ui: React.ReactNode) => render(<QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>{ui}</QueryClientProvider>);
 
 describe('TemplateSheet', () => {

@@ -34,6 +34,12 @@ export function TemplateSheet({ t, page, width }: { t: MemoTemplate; page: numbe
 
             <div style={{ fontFamily: SANS, fontSize: 12, fontWeight: 700, textAlign: 'center', margin: '22px 0 12px' }}>{UNIVERSITY.heading}</div>
 
+            {t.reference_number && (
+              <div style={{ fontSize: 10, color: '#555', marginBottom: 8, textAlign: 'right' }}>
+                Ref: {t.reference_number}
+              </div>
+            )}
+
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', borderBottom: '3px double #000', fontSize: 12, minHeight: 88 }}>
               <div style={{ borderRight: '1px solid #000', padding: '6px 10px 10px 4px' }}>
                 <p style={{ margin: 0 }}><b>FROM</b>: {t.from_name}{t.from_staff_no ? ` (${t.from_staff_no})` : ''}</p>
@@ -99,11 +105,21 @@ export function TemplateSheet({ t, page, width }: { t: MemoTemplate; page: numbe
         </div>
 
         {last && (
-          <div style={{ marginTop: 26, fontSize: 12, lineHeight: '19px' }}>
-            <p style={{ margin: 0 }}>{t.signature.name}</p>
-            {t.signature.title && <p style={{ margin: '8px 0 0' }}>{t.signature.title}</p>}
-            {t.signature.unit && <p style={{ margin: '8px 0 0' }}>{t.signature.unit}</p>}
-          </div>
+          <>
+            <div style={{ marginTop: 26, fontSize: 12, lineHeight: '19px' }}>
+              <p style={{ margin: 0 }}>{t.signature.name}</p>
+              {t.signature.title && <p style={{ margin: '8px 0 0' }}>{t.signature.title}</p>}
+              {t.signature.unit && <p style={{ margin: '8px 0 0' }}>{t.signature.unit}</p>}
+            </div>
+            {t.cc && t.cc.length > 0 && (
+              <div style={{ marginTop: 24, fontSize: 11, lineHeight: '16px' }}>
+                <p style={{ margin: 0, fontWeight: 700 }}>CC:</p>
+                {t.cc.map((ccItem, idx) => (
+                  <p key={idx} style={{ margin: '4px 0 0', paddingLeft: 8 }}>{ccItem}</p>
+                ))}
+              </div>
+            )}
+          </>
         )}
         {pages.length > 1 && <div style={{ position: 'absolute', bottom: 22, left: 0, right: 0, textAlign: 'center', fontSize: 10, color: '#555' }}>Page {page} of {pages.length}</div>}
       </div>
