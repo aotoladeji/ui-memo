@@ -10,7 +10,7 @@ interface Dept { id: number; name: string; code: string; units: Unit[]; has_logo
 interface Fac { id: number; name: string; code: string; departments: Dept[] }
 
 export default function OrgPage() {
-  useDocumentTitle('Organisation');
+  useDocumentTitle('Faculty Management');
   const me = useAuth((s) => s.me);
   const isSuperAdmin = me?.role === 'super_admin';
   const [showAddDept, setShowAddDept] = useState(false);
@@ -20,7 +20,7 @@ export default function OrgPage() {
     <div className="mx-auto max-w-3xl p-4 sm:p-6">
       <div className="mb-4 flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-bold">Organisation</h1>
+          <h1 className="text-xl font-bold">Faculty Management</h1>
           <p className="text-sm text-ink-soft">Institution → Faculties → Departments → Units.</p>
         </div>
         {isSuperAdmin && (

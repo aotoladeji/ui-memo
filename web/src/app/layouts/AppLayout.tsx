@@ -32,7 +32,7 @@ export default function AppLayout() {
         <NavLink to="/drafts" className={link}><FileText size={16} /> Drafts</NavLink>
         <NavLink to="/memos/new" className={link}><FilePlus2 size={16} /> New memo</NavLink>
         {isAdmin && <p className="mb-1 mt-4 px-3 text-xs font-bold text-ink-soft">Administration</p>}
-        {isAdmin && <NavLink to="/admin/org" className={link}><Building2 size={16} /> Organisation</NavLink>}
+        {isAdmin && <NavLink to="/admin/org" className={link}><Building2 size={16} /> Faculty</NavLink>}
         {isAdmin && <NavLink to="/admin/people" className={link}><Users size={16} /> People</NavLink>}
         {me?.role === 'super_admin' && <NavLink to="/admin/permissions" className={link}><ShieldCheck size={16} /> Permissions</NavLink>}
         <div className="mt-auto border-t border-surface-line pt-3 text-sm">
