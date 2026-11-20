@@ -82,10 +82,12 @@ function NotePin({ note, width, height }: { note: Note; width: number; height: n
   };
 
   return (
-    <button
+    <div
       className={`pointer-events-auto absolute -translate-x-1/2 -translate-y-1/2 rounded-md px-2 py-1 text-left text-xs shadow-md ${activeNoteId === note.id ? 'ring-2 ring-brand-600' : 'ring-1 ring-black/10'} ${note.status === 'resolved' ? 'opacity-60' : ''}`}
       style={{ left: note.x * width, top: note.y * height, background: note.color, width: 120, touchAction: 'none', cursor: canMove ? 'move' : 'pointer' }}
       aria-label={`Note: ${note.body}`}
+      role="button"
+      tabIndex={0}
       onPointerDown={(e) => { 
         if (!canMove || editingHeader || editingFooter) return;
         (e.target as HTMLElement).setPointerCapture(e.pointerId); 
@@ -104,6 +106,11 @@ function NotePin({ note, width, height }: { note: Note; width: number; height: n
         const n = useEditor.getState().notes[note.id];
         try { await api.patch(`/notes/${note.id}`, { page_number: n.page_number, x: n.x, y: n.y }); }
         catch { moveNote(note.id, note.page_number, d.ox, d.oy); }   // roll back
+      }}
+      onClick={(e) => {
+        if (!drag.current?.moved && !editingHeader && !editingFooter) {
+          setActive(note.id);
+        }
       }}>
       {open && <span className="absolute -right-1 -top-1 flex h-3 w-3"><span className="absolute inline-flex h-full w-full animate-ping2 rounded-full bg-brand-500" /><span className="relative inline-flex h-3 w-3 rounded-full bg-brand-600" /></span>}
       
@@ -178,7 +185,7 @@ function NotePin({ note, width, height }: { note: Note; width: number; height: n
           <>From: {author?.name ?? <span className="text-gray-400 italic">Staff</span>}</>
         )}
       </div>
-    </button>
+    </div>
   );
 }
 

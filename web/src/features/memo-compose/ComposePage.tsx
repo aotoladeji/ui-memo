@@ -46,8 +46,8 @@ export default function ComposePage() {
 
   const preview: MemoTemplate = useMemo(() => ({
     v: 1, 
-    department_id: me.department_id ?? 1, 
-    department_name: me.department_name || 'Computer Science', 
+    department_id: me.department_id ?? 1,
+    department_name: me.unit_name || me.department_name || me.faculty_name || 'University of Ibadan', 
     office_line: f.office_line,
     from_name: f.from_name, 
     from_staff_no: f.from_staff_no, 
@@ -71,7 +71,7 @@ export default function ComposePage() {
         id = (await api.post('/memos', { kind: 'template', subject: f.subject, routing_type: routing, priority, page_count: n, page_dims: pageDims(n),
           template: { 
             department_id: me.department_id ?? 1,
-            department_name: me.department_name || 'Computer Science',
+            department_name: me.unit_name || me.department_name || me.faculty_name || 'University of Ibadan',
             to: f.to, 
             thru: f.thru,
             cc: f.cc,

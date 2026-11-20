@@ -20,7 +20,7 @@ export interface DB {
   users: DUser[]; memos: DMemo[]; docs: DDoc[]; routes: DRoute[]; recipients: DRecipient[]; annotations: DAnn[]; notes: DNote[]; replies: DReply[]; minutes: DMinute[]; minuteReplies: DMinuteReply[]; rules: DRule[];
 }
 
-const KEY = 'ui_memo_mock_db_v2';
+const KEY = 'ui_memo_mock_db_v3';
 export const files = new Map<string, ArrayBuffer>();   // uploaded originals live in memory for the session
 
 export function nextId(db: DB, table: string): number { db.seq[table] = (db.seq[table] ?? 0) + 1; return db.seq[table]; }
@@ -30,13 +30,20 @@ function seed(): DB {
     ({ id, staff_no, name, email: `${staff_no.toLowerCase()}@ui.edu.ng`, password: 'ChangeMe#2026', role, title, unit_id, is_executive: false, can_send_global_broadcast: false, is_active: true, ...extra });
   const db: DB = {
     seq: {},
-    faculties: [{ id: 1, name: 'Faculty of Science', code: 'SCI' }],
-    departments: [{ id: 1, faculty_id: 1, name: 'Computer Science', code: 'CSC' }],
-    units: [{ id: 1, department_id: 1, name: 'Registry', code: 'REG' }, { id: 2, department_id: 1, name: 'ICT Unit', code: 'ICT' }],
+    faculties: [{ id: 1, name: 'Faculty of Science', code: 'SCI' }, { id: 2, name: 'Administration', code: 'ADMIN' }],
+    departments: [
+      { id: 1, faculty_id: 1, name: 'Computer Science', code: 'CSC' },
+      { id: 2, faculty_id: 2, name: 'Central Administration', code: 'CENTRAL' }
+    ],
+    units: [
+      { id: 1, department_id: 2, name: 'Registry', code: 'REG' }, 
+      { id: 2, department_id: 1, name: 'ICT Unit', code: 'ICT' },
+      { id: 3, department_id: 2, name: 'Office of the Vice-Chancellor', code: 'VC' }
+    ],
     users: [
       u(1, 'SA001', 'System Super Admin', 'super_admin', null, 'Super Administrator'),
-      u(2, 'VC001', 'Vice-Chancellor', 'staff', 1, 'Vice-Chancellor', { is_executive: true, can_send_global_broadcast: true }),
-      u(3, 'DVC01', 'Deputy Vice-Chancellor (Admin)', 'staff', 1, 'DVC (Administration)', { is_executive: true }),
+      u(2, 'VC001', 'Vice-Chancellor', 'staff', 3, 'Vice-Chancellor', { is_executive: true, can_send_global_broadcast: true }),
+      u(3, 'DVC01', 'Deputy Vice-Chancellor (Admin)', 'staff', 3, 'DVC (Administration)', { is_executive: true }),
       u(4, 'HD001', 'ICT Unit Head', 'unit_head', 2, 'Head, ICT Unit'),
       u(5, 'ST001', 'Ada Okafor', 'staff', 2, 'Systems Officer'),
       u(6, 'ST002', 'Tunde Bello', 'staff', 2, 'Network Engineer'),

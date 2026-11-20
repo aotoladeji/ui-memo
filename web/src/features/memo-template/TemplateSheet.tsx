@@ -20,16 +20,19 @@ export function TemplateSheet({ t, page, width }: { t: MemoTemplate; page: numbe
       <div style={{ width: A4.w, height: A4.h, transform: `scale(${k})`, transformOrigin: 'top left', padding: '40px 56px 56px', boxSizing: 'border-box', color: '#000', fontFamily: SERIF, position: 'absolute', top: 0, left: 0 }}>
         {first ? (
           <>
-            <header style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-              <img src={UNIVERSITY.logo} alt="University of Ibadan crest" width={74} height={82} style={{ objectFit: 'contain', flexShrink: 0 }} />
-              <div style={{ flex: 1, textAlign: 'center', lineHeight: 1.25 }}>
+            <header style={{ display: 'flex', alignItems: 'center', gap: 12, justifyContent: deptLogo ? 'space-between' : 'center' }}>
+              {deptLogo && <img src={UNIVERSITY.logo} alt="University of Ibadan crest" width={74} height={82} style={{ objectFit: 'contain', flexShrink: 0 }} />}
+              <div style={{ flex: deptLogo ? 1 : 'none', textAlign: 'center', lineHeight: 1.25 }}>
+                {!deptLogo && (
+                  <div style={{ marginBottom: 8 }}>
+                    <img src={UNIVERSITY.logo} alt="University of Ibadan crest" width={74} height={82} style={{ objectFit: 'contain', margin: '0 auto', display: 'block' }} />
+                  </div>
+                )}
                 <div style={{ fontSize: 16, fontWeight: 700, textTransform: 'uppercase' }}>{t.department_name}</div>
                 <div style={{ fontSize: 11, fontWeight: 700, fontStyle: 'italic' }}>{UNIVERSITY.name}</div>
                 {t.office_line && <div style={{ fontSize: 11, fontWeight: 700, fontStyle: 'italic' }}>{t.office_line}</div>}
               </div>
-              {deptLogo
-                ? <img src={deptLogo} alt={`${t.department_name} logo`} width={74} height={74} style={{ objectFit: 'contain', flexShrink: 0 }} />
-                : <div aria-label="Department logo placeholder" style={{ width: 74, height: 74, flexShrink: 0, border: '2px dashed #999', borderRadius: '50%', display: 'grid', placeItems: 'center', fontSize: 9, color: '#777', textAlign: 'center' }}>Department logo</div>}
+              {deptLogo && <img src={deptLogo} alt={`${t.department_name} logo`} width={74} height={74} style={{ objectFit: 'contain', flexShrink: 0 }} />}
             </header>
 
             <div style={{ fontFamily: SANS, fontSize: 12, fontWeight: 700, textAlign: 'center', margin: '22px 0 12px' }}>{UNIVERSITY.heading}</div>

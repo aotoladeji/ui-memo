@@ -4,6 +4,11 @@ export type Classification = 'standard' | 'executive' | 'confidential';
 export interface Me {
   id: number; name: string; email: string; role: Role; title?: string | null;
   unit_id: number | null; is_executive: boolean; can_send_global_broadcast: boolean;
+  staff_no?: string;
+  unit_name?: string | null;
+  department_id?: number | null;
+  department_name?: string | null;
+  faculty_name?: string | null;
 }
 export interface Reply { id: number; note_id: number; author_id: number; body: string; created_at: string }
 export interface MinuteReply { id: number; minute_id: number; author_id: number; body: string; created_at: string }

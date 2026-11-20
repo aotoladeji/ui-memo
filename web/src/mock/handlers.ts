@@ -12,7 +12,27 @@ const noContent = (): Out => ({ status: 204, data: undefined });
 
 const need = (c: Ctx): DUser => { if (!c.me) throw new HttpError(401, 'Unauthenticated.'); return c.me; };
 const lite = (u: DUser) => ({ id: u.id, name: u.name, title: u.title, unit_id: u.unit_id });
-const shape = (u: DUser) => ({ id: u.id, name: u.name, email: u.email, role: u.role, title: u.title, unit_id: u.unit_id, is_executive: u.is_executive, can_send_global_broadcast: u.can_send_global_broadcast });
+const shape = (u: DUser, db: DB) => {
+  const unit = u.unit_id ? db.units.find((x) => x.id === u.unit_id) : null;
+  const department = unit ? db.departments.find((d) => d.id === unit.department_id) : null;
+  const faculty = department ? db.faculties.find((f) => f.id === department.faculty_id) : null;
+  
+  return {
+    id: u.id, 
+    name: u.name, 
+    email: u.email, 
+    role: u.role, 
+    title: u.title, 
+    unit_id: u.unit_id,
+    is_executive: u.is_executive, 
+    can_send_global_broadcast: u.can_send_global_broadcast,
+    staff_no: u.staff_no,
+    unit_name: unit?.name || null,
+    department_id: department?.id || null,
+    department_name: department?.name || null,
+    faculty_name: faculty?.name || null
+  };
+};
 const val = (c: Ctx, f: Record<string, string>) => { const errors: Record<string, string[]> = {}; for (const [k, m] of Object.entries(f)) if (c.body?.[k] === undefined || c.body[k] === '' || c.body[k] === null) errors[k] = [m]; if (Object.keys(errors).length) throw new HttpError(422, 'Validation failed.', errors); };
 
 function viewerRoute(c: Ctx, memoId: number, routeId?: number): DRoute {
@@ -95,9 +115,9 @@ on('post', '/auth/login', (c) => {
   val(c, { email: 'Enter your email.', password: 'Enter your password.' });
   const u = c.db.users.find((x) => x.email === c.body.email && x.is_active);
   if (!u || u.password !== c.body.password) throw new HttpError(422, 'Email or password is incorrect.');
-  return ok({ token: `mock-${u.id}`, user: shape(u) });
+  return ok({ token: `mock-${u.id}`, user: shape(u, c.db) });
 });
-on('get', '/auth/me', (c) => ok(shape(need(c))));
+on('get', '/auth/me', (c) => ok(shape(need(c), c.db)));
 on('post', '/auth/logout', () => noContent());
 on('get', '/users/search', (c) => {
   const me = need(c); const q = String(c.query.q ?? '').toLowerCase();
@@ -195,7 +215,29 @@ on('post', '/memos', (c) => {
     
     const key = `up-${id}`;
     return (async () => {
-      files.set(key, await file.arrayBuffer());
+      let finalMime = file.type || 'application/pdf';
+      let finalBuffer = await file.arrayBuffer();
+      
+      // For Word documents in mock/demo mode, generate a PDF placeholder
+      // (In production, backend would convert Word to PDF)
+      const isWordDoc = file.type === 'application/msword' || 
+                        file.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+      
+      if (isWordDoc) {
+        // Generate a placeholder PDF indicating this was a Word document
+        const { samplePdf } = await import('./pdf');
+        finalMime = 'application/pdf';
+        finalBuffer = samplePdf(subject, [
+          'This is a placeholder for an uploaded Word document.',
+          '',
+          `Original file: ${(file as File).name}`,
+          '',
+          'In production, Word documents are converted to PDF on the backend.',
+          'In demo mode, a placeholder PDF is shown instead.'
+        ]);
+      }
+      
+      files.set(key, finalBuffer);
       db.memos.push({ 
         id, 
         ref_no: `UI/${me.unit_id === 2 ? 'ICT' : 'REG'}/2026/${String(id).padStart(4, '0')}`, 
@@ -211,9 +253,9 @@ on('post', '/memos', (c) => {
       db.docs.push({ 
         memo_id: id, 
         kind: 'file',
-        mime: file.type || 'application/pdf', 
-        page_count: Number(fd.get('page_count') ?? 1), 
-        page_dims: dims.length ? dims : null, 
+        mime: finalMime, 
+        page_count: isWordDoc ? 2 : Number(fd.get('page_count') ?? 1), 
+        page_dims: isWordDoc ? null : (dims.length ? dims : null), 
         file_key: key,
         template: undefined
       });

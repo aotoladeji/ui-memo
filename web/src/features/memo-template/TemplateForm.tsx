@@ -46,9 +46,9 @@ export function TemplateForm({ value, onChange }: { value: TemplateFields; onCha
       
       <div className="grid gap-4 sm:grid-cols-2">
         <label className="block text-sm font-bold">From (Name)
-          <input className="field mt-1" value={value.from_name} onChange={(e) => set('from_name', e.target.value)} maxLength={255} required placeholder="Your name" /></label>
+          <input className="field mt-1 bg-surface-soft" value={value.from_name} readOnly disabled title="Auto-filled from your profile" /></label>
         <label className="block text-sm font-bold">From (Staff No.)
-          <input className="field mt-1" value={value.from_staff_no} onChange={(e) => set('from_staff_no', e.target.value)} maxLength={50} placeholder="e.g. ST001" /></label>
+          <input className="field mt-1 bg-surface-soft" value={value.from_staff_no} readOnly disabled title="Auto-filled from your profile" /></label>
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2">
@@ -161,12 +161,12 @@ export function TemplateForm({ value, onChange }: { value: TemplateFields; onCha
       <fieldset className="space-y-3 rounded-lg border border-surface-line bg-surface-soft p-4">
         <legend className="px-2 text-sm font-bold">Signature Block</legend>
         <label className="block text-sm font-bold">Name
-          <input className="field mt-1" value={value.signature_name} onChange={(e) => set('signature_name', e.target.value)} maxLength={255} required placeholder="Your name" /></label>
+          <input className="field mt-1" value={value.signature_name} readOnly disabled title="Auto-filled from your profile" /></label>
         <div className="grid gap-4 sm:grid-cols-2">
           <label className="block text-sm font-bold">Title
-            <input className="field mt-1" value={value.signature_title} onChange={(e) => set('signature_title', e.target.value)} maxLength={255} placeholder="e.g. Network Administrator" /></label>
+            <input className="field mt-1" value={value.signature_title} readOnly disabled title="Auto-filled from your profile" /></label>
           <label className="block text-sm font-bold">Unit
-            <input className="field mt-1" value={value.signature_unit} onChange={(e) => set('signature_unit', e.target.value)} maxLength={255} placeholder="e.g. MIS/ITeMS" /></label>
+            <input className="field mt-1" value={value.signature_unit} readOnly disabled title="Auto-filled from your profile" /></label>
         </div>
       </fieldset>
       
