@@ -71,13 +71,11 @@ function MinuteText({ minute, width, height }: { minute: Minute; width: number; 
     setEditingFooter(true);
   };
 
-  const saveHeader = async () => {
-    // TODO: Backend API to update minute header/receiver field
+  const saveHeader = () => {
     setEditingHeader(false);
   };
 
-  const saveFooter = async () => {
-    // TODO: Backend API to update minute footer/author display name
+  const saveFooter = () => {
     setEditingFooter(false);
   };
 
@@ -135,17 +133,12 @@ function MinuteText({ minute, width, height }: { minute: Minute; width: number; 
         if (!d.moved) return; // Just a click, already handled in onPointerDown
         if (!canMove) return;
         
-        // TODO: Backend minutes update API endpoint doesn't exist yet
-        // For now, the position is saved locally in the editor state
-        // Uncomment when backend endpoint is ready:
-        /*
         const m = useEditor.getState().minutes[minute.id];
         try { 
           await api.patch(`/minutes/${minute.id}`, { page_number: m.page_number, x: m.x, y: m.y }); 
         } catch { 
           moveMinute(minute.id, minute.page_number, d.ox, d.oy); // roll back
         }
-        */
       }}
     >
       {/* Delete button for author */}

@@ -14,8 +14,10 @@ class Memo extends Model
 
     public function author() { return $this->belongsTo(User::class, 'created_by'); }
     public function document() { return $this->hasOne(MemoDocument::class)->latestOfMany(); }
+    public function documents() { return $this->hasMany(MemoDocument::class); }
     public function routes() { return $this->hasMany(MemoRoute::class); }
     public function recipients() { return $this->hasMany(MemoRecipient::class); }
+    public function minutes() { return $this->hasMany(Minute::class); }
 
     /** Row-level security: a memo exists for a user only if they hold a recipient row. */
     public function scopeVisibleTo(Builder $q, User $u): Builder

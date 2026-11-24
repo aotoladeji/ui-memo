@@ -90,7 +90,7 @@ function NoteThread({ note }: { note: Note }) {
   const setActive = useEditor((s) => s.setActive);
   const replies = useEditor((s) => s.replies[note.id] ?? EMPTY_REPLIES);
   const author = useEditor((s) => s.authors[note.author_id]);
-  const authors = useEditor((s) => s.authors, (a, b) => a === b);
+  const authors = useEditor((s) => s.authors);
   const addReply = useEditor((s) => s.addReply);
   const upsertNote = useEditor((s) => s.upsertNote);
   const readOnly = useEditor((s) => s.readOnly);
@@ -195,7 +195,7 @@ function NoteThread({ note }: { note: Note }) {
 function MinuteThread({ minute }: { minute: Minute }) {
   const minuteReplies = useEditor((s) => s.minuteReplies?.[minute.id] ?? EMPTY_MINUTE_REPLIES);
   const author = useEditor((s) => s.authors[minute.author_id]);
-  const authors = useEditor((s) => s.authors, (a, b) => a === b);
+  const authors = useEditor((s) => s.authors);
   const addMinuteReply = useEditor((s) => s.addMinuteReply);
   const readOnly = useEditor((s) => s.readOnly);
   const routeId = useEditor((s) => s.routeId);

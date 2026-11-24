@@ -1,6 +1,6 @@
 <?php
 
-use App\Http\Controllers\Api\V1\{AnnotationController, AuthController, ForwardController, MemoController, NoteController, UserDirectoryController};
+use App\Http\Controllers\Api\V1\{AnnotationController, AuthController, ForwardController, MemoController, MinuteController, NoteController, UserDirectoryController};
 use App\Http\Controllers\Api\V1\Admin\{OrgController, UserAdminController};
 use Illuminate\Support\Facades\Route;
 
@@ -16,6 +16,7 @@ Route::prefix('v1')->group(function () {
         Route::get('memos', [MemoController::class, 'index']);
         Route::post('memos', [MemoController::class, 'store']);
         Route::get('memos/{memo}', [MemoController::class, 'show']);
+        Route::patch('memos/{memo}/template', [MemoController::class, 'updateTemplate']);
         Route::get('memos/{memo}/file', [MemoController::class, 'file']);
         Route::post('memos/{memo}/send', [MemoController::class, 'send']);
         Route::post('memos/{memo}/complete', [ForwardController::class, 'complete']);
@@ -25,11 +26,22 @@ Route::prefix('v1')->group(function () {
         Route::delete('annotations/{annotation}', [AnnotationController::class, 'destroy']);
         Route::post('memos/{memo}/notes', [NoteController::class, 'store']);
         Route::patch('notes/{note}', [NoteController::class, 'update']);
+        Route::delete('notes/{note}', [NoteController::class, 'destroy']);
         Route::post('notes/{note}/replies', [NoteController::class, 'reply'])->middleware('throttle:60,1');
+
+        // Minutes
+        Route::post('memos/{memo}/minutes', [MinuteController::class, 'store']);
+        Route::post('minutes', [MinuteController::class, 'store']);
+        Route::patch('minutes/{minute}', [MinuteController::class, 'update']);
+        Route::delete('minutes/{minute}', [MinuteController::class, 'destroy']);
+        Route::post('minutes/{minute}/replies', [MinuteController::class, 'reply']);
 
         // Forwarding with selective masking
         Route::post('memos/{memo}/forward', [ForwardController::class, 'store']);
         Route::post('memos/{memo}/forward-preview', [ForwardController::class, 'preview']);
+
+        // Department logo (viewable by authenticated users)
+        Route::get('departments/{department}/logo', [OrgController::class, 'showLogo']);
 
         // Administration
         Route::prefix('admin')->group(function () {
@@ -38,6 +50,7 @@ Route::prefix('v1')->group(function () {
                 Route::post('departments', [OrgController::class, 'storeDepartment']);
                 Route::patch('departments/{department}', [OrgController::class, 'updateDepartment']);
                 Route::delete('departments/{department}', [OrgController::class, 'destroyDepartment']);
+                Route::post('departments/{department}/logo', [OrgController::class, 'uploadLogo']);
                 Route::post('units', [OrgController::class, 'storeUnit']);
                 Route::patch('units/{unit}', [OrgController::class, 'updateUnit']);
                 Route::delete('units/{unit}', [OrgController::class, 'destroyUnit']);

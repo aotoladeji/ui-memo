@@ -2,7 +2,6 @@ import { Suspense, useEffect, useState } from 'react';
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { Building2, FilePlus2, FileText, Inbox, LogOut, Menu, Send, ShieldCheck, Users } from 'lucide-react';
 import { useAuth } from '@/features/auth/authStore';
-import { USE_MOCK } from '@/shared/api';
 
 const link = ({ isActive }: { isActive: boolean }) =>
   `flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-bold ${isActive ? 'bg-brand-600 text-white' : 'hover:bg-brand-50'}`;
@@ -37,7 +36,6 @@ export default function AppLayout() {
         {me?.role === 'super_admin' && <NavLink to="/admin/permissions" className={link}><ShieldCheck size={16} /> Permissions</NavLink>}
         <div className="mt-auto border-t border-surface-line pt-3 text-sm">
           <p className="font-bold">{me?.name}</p><p className="mb-2 text-ink-soft">{me?.title ?? me?.role}</p>
-          {USE_MOCK && <p className="mb-2 rounded bg-brand-50 px-2 py-1 text-xs">Demo mode (no backend)</p>}
           <button className="btn btn-ghost w-full" onClick={async () => { await logout(); nav('/login', { replace: true }); }}><LogOut size={14} /> Sign out</button>
         </div>
       </nav>

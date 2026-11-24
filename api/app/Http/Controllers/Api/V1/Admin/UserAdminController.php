@@ -15,10 +15,16 @@ class UserAdminController extends Controller
     {
         $deptIds = $this->scope->departmentIds($r->user());
         $s = trim((string) $r->query('q', ''));
-        return User::with('unit:id,name,code,department_id')
+        $users = User::with('unit:id,name,code,department_id')
             ->when($deptIds !== null, fn ($q) => $q->whereHas('unit', fn ($u) => $u->whereIn('department_id', $deptIds))->whereIn('role', ['staff', 'unit_head']))
             ->when($s, fn ($q) => $q->where(fn ($w) => $w->where('name', 'like', "%$s%")->orWhere('staff_no', 'like', "$s%")))
-            ->orderBy('name')->paginate(30);
+            ->orderBy('name');
+
+        if ($r->has('page') || $r->has('per_page')) {
+            return $users->paginate($r->integer('per_page', 30));
+        }
+
+        return ['data' => $users->get()];
     }
 
     public function store(Request $r)

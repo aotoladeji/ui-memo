@@ -35,7 +35,7 @@ function Thread({ note }: { note: Note }) {
   const setActive = useEditor((s) => s.setActive);
   const replies = useEditor((s) => s.replies[note.id] ?? EMPTY);
   const author = useEditor((s) => s.authors[note.author_id]);
-  const authors = useEditor((s) => s.authors, (a, b) => a === b);
+  const authors = useEditor((s) => s.authors);
   const addReply = useEditor((s) => s.addReply);
   const upsertNote = useEditor((s) => s.upsertNote);
   const readOnly = useEditor((s) => s.readOnly);

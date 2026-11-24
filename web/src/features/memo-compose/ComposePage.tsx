@@ -1,7 +1,7 @@
 import { FormEvent, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { FileText, Upload } from 'lucide-react';
-import { api, errorText, USE_MOCK } from '@/shared/api';
+import { api, errorText } from '@/shared/api';
 import { useAuth } from '@/features/auth/authStore';
 import { useDocumentTitle } from '@/shared/useDocumentTitle';
 import { measureFile } from '@/features/memo-viewer/store/loadDocument';
@@ -16,7 +16,7 @@ type Mode = 'template' | 'upload';
 export default function ComposePage() {
   useDocumentTitle('New memo');
   const nav = useNavigate(); const me = useAuth((s) => s.me)!;
-  const canTemplate = USE_MOCK || !!me.department_id; // Always enable in demo/presentation mode
+  const canTemplate = !!(me.department_id || me.unit_id);
   const [mode, setMode] = useState<Mode>('template');
   const [routing, setRouting] = useState<'internal_unit' | 'peer' | 'global'>('peer'); 
   const [priority, setPriority] = useState('normal');
@@ -30,24 +30,20 @@ export default function ComposePage() {
     office_line: '', 
     body: '',
     from_name: me.name,
-    from_staff_no: me.staff_no || 'DEMO001',
+    from_staff_no: me.staff_no || '',
     signature_name: me.name,
-    signature_title: me.title || 'Staff Member',
-    signature_unit: me.unit_name || 'ICT Unit'
+    signature_title: me.title || '',
+    signature_unit: me.unit_name || ''
   });
-  const [referenceNumber, setReferenceNumber] = useState(() => {
-    const year = new Date().getFullYear();
-    const seq = String(Math.floor(Math.random() * 9999) + 1).padStart(4, '0');
-    return `UI/CODE/${year}/${seq}`;
-  });
+  const [referenceNumber, setReferenceNumber] = useState('');
   const [file, setFile] = useState<File | null>(null);
   const [err, setErr] = useState(''); const [busy, setBusy] = useState(false);
-  const canGlobal = USE_MOCK || me.role === 'super_admin' || me.can_send_global_broadcast; // Always enable in demo/presentation mode
+  const canGlobal = me.role === 'super_admin' || me.can_send_global_broadcast;
 
   const preview: MemoTemplate = useMemo(() => ({
     v: 1, 
-    department_id: me.department_id ?? 1,
-    department_name: me.unit_name || me.department_name || me.faculty_name || 'University of Ibadan', 
+    department_id: me.department_id ?? null,
+    department_name: me.department_name || me.unit_name || me.faculty_name || 'University of Ibadan', 
     office_line: f.office_line,
     from_name: f.from_name, 
     from_staff_no: f.from_staff_no, 
@@ -58,7 +54,7 @@ export default function ComposePage() {
     subject: f.subject, 
     body: f.body,
     signature: { name: f.signature_name, title: f.signature_title, unit: f.signature_unit },
-    reference_number: referenceNumber,
+    reference_number: referenceNumber || undefined,
   }), [f, me, referenceNumber]);
   const pages = paginate(f.body).length;
 
@@ -70,8 +66,8 @@ export default function ComposePage() {
         const n = templatePageCount(f.body);
         id = (await api.post('/memos', { kind: 'template', subject: f.subject, routing_type: routing, priority, page_count: n, page_dims: pageDims(n),
           template: { 
-            department_id: me.department_id ?? 1,
-            department_name: me.unit_name || me.department_name || me.faculty_name || 'University of Ibadan',
+            department_id: me.department_id ?? null,
+            department_name: me.department_name || me.unit_name || me.faculty_name || 'University of Ibadan',
             to: f.to, 
             thru: f.thru,
             cc: f.cc,
@@ -83,7 +79,7 @@ export default function ComposePage() {
             signature_name: f.signature_name,
             signature_title: f.signature_title,
             signature_unit: f.signature_unit,
-            reference_number: referenceNumber
+            reference_number: referenceNumber || undefined,
           } })).data.id;
       } else {
         if (!file) return;

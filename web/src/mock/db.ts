@@ -83,7 +83,7 @@ function ensureFiles(d: DB) {
   if (!d.minuteReplies) d.minuteReplies = [];
   
   for (const doc of d.docs) {
-    if (files.has(doc.file_key)) continue;
+    if (!doc.file_key || files.has(doc.file_key)) continue;
     const m = d.memos.find((x) => x.id === doc.memo_id)!;
     files.set(doc.file_key, samplePdf(m.subject, doc.file_key.startsWith('seed') ? ['(Demo document)'] : ['Demo mode keeps uploaded files in memory only.', 'Re-upload the file to view the original after a page refresh.']));
     if (!doc.file_key.startsWith('seed')) { doc.mime = 'application/pdf'; doc.page_count = 2; doc.page_dims = null; }

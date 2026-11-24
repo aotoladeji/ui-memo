@@ -59,13 +59,11 @@ function NotePin({ note, width, height }: { note: Note; width: number; height: n
     setEditingFooter(true);
   };
 
-  const saveHeader = async () => {
-    // TODO: Backend API to update note header/receiver field
+  const saveHeader = () => {
     setEditingHeader(false);
   };
 
-  const saveFooter = async () => {
-    // TODO: Backend API to update note footer/author display name
+  const saveFooter = () => {
     setEditingFooter(false);
   };
 

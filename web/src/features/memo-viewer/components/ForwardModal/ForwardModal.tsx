@@ -16,9 +16,9 @@ export function ForwardModal({ open, onClose, onForwarded }: ForwardModalProps) 
   const me = useAuth((s) => s.me)!;
   const memoId = useEditor((s) => s.memoId);
   const routeId = useEditor((s) => s.routeId);
-  const authors = useEditor((s) => s.authors, (a, b) => a === b);
-  const notes = useEditor((s) => s.notes, (a, b) => a === b);
-  const replies = useEditor((s) => s.replies, (a, b) => a === b);
+  const authors = useEditor((s) => s.authors);
+  const notes = useEditor((s) => s.notes);
+  const replies = useEditor((s) => s.replies);
   const annCount = useEditor((s) => Object.keys(s.annotations).length);
   const noteList = useMemo(() => Object.values(notes).sort((a, b) => a.page_number - b.page_number), [notes]);
   const replyCounts = useMemo(() => Object.fromEntries(Object.entries(replies).map(([k, v]) => [Number(k), v.length])), [replies]);

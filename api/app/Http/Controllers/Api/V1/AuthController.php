@@ -23,6 +23,25 @@ class AuthController extends Controller
 
     private function shape(User $u): array
     {
-        return $u->only('id', 'name', 'email', 'role', 'title', 'unit_id', 'is_executive', 'can_send_global_broadcast');
+        $u->loadMissing('unit.department.faculty');
+        $unit = $u->unit;
+        $dept = $unit?->department;
+        $faculty = $dept?->faculty;
+
+        return [
+            'id' => $u->id,
+            'name' => $u->name,
+            'email' => $u->email,
+            'role' => $u->role,
+            'title' => $u->title,
+            'unit_id' => $u->unit_id,
+            'is_executive' => (bool)$u->is_executive,
+            'can_send_global_broadcast' => (bool)$u->can_send_global_broadcast,
+            'staff_no' => $u->staff_no,
+            'unit_name' => $unit?->name,
+            'department_id' => $dept?->id,
+            'department_name' => $dept?->name,
+            'faculty_name' => $faculty?->name,
+        ];
     }
 }

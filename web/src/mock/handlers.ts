@@ -294,6 +294,7 @@ on('get', '/memos/:id', memoShow);
 on('get', '/memos/:id/file', (c) => {
   viewerRoute(c, Number(c.params.id));
   const doc = c.db.docs.find((d) => d.memo_id === Number(c.params.id))!;
+  if (!doc.file_key) throw new HttpError(404, 'File not found');
   return ok(files.get(doc.file_key)!);
 });
 on('post', '/memos/:id/send', (c) => {
@@ -411,7 +412,7 @@ const admin = (c: Ctx, only?: 'super_admin') => { const me = need(c); if (!(me.r
 on('get', '/admin/org', (c) => { admin(c); return ok(c.db.faculties.map((f) => ({ ...f, departments: c.db.departments.filter((d) => d.faculty_id === f.id).map((d) => ({ ...d, units: c.db.units.filter((u) => u.department_id === d.id) })) }))); });
 on('get', '/admin/users', (c) => {
   admin(c); const q = String(c.query.q ?? '').toLowerCase();
-  return ok({ data: c.db.users.filter((u) => !q || u.name.toLowerCase().includes(q) || u.staff_no.toLowerCase().startsWith(q)).map((u) => ({ ...shape(u), staff_no: u.staff_no, is_active: u.is_active, unit: c.db.units.find((x) => x.id === u.unit_id) ?? undefined })) });
+  return ok({ data: c.db.users.filter((u) => !q || u.name.toLowerCase().includes(q) || u.staff_no.toLowerCase().startsWith(q)).map((u) => ({ ...shape(u, c.db), staff_no: u.staff_no, is_active: u.is_active, unit: c.db.units.find((x) => x.id === u.unit_id) ?? undefined })) });
 });
 on('patch', '/admin/users/:id/permissions', (c) => {
   admin(c, 'super_admin'); const u = c.db.users.find((x) => x.id === Number(c.params.id));

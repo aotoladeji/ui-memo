@@ -4,7 +4,7 @@ namespace App\Http\Controllers\Api\V1;
 
 use App\Actions\{InitiateMemo, SendMemo};
 use App\Http\Controllers\Controller;
-use App\Models\{AuditLog, Memo, MemoRecipient, User};
+use App\Models\{AuditLog, Memo, MemoDocument, MemoRecipient, Minute, MinuteReply, User};
 use App\Services\{ChainVisibility, RoutingGuard};
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -13,21 +13,107 @@ class MemoController extends Controller
 {
     public function index(Request $r)
     {
+        $user = $r->user();
         $box = $r->query('box', 'inbox');
-        $q = Memo::visibleTo($r->user())->with('author:id,name,title')->latest('memos.id');
+
+        $q = Memo::visibleTo($user)
+            ->with(['author.unit.department'])
+            ->latest('memos.id');
+
         match ($box) {
-            'drafts' => $q->where('status', 'draft')->where('created_by', $r->user()->id),
-            'sent'   => $q->where('status', '!=', 'draft')->where('created_by', $r->user()->id),
-            default  => $q->where('status', '!=', 'draft')->where('created_by', '!=', $r->user()->id),
+            'drafts' => $q->where('status', 'draft')->where('created_by', $user->id),
+            'sent'   => $q->where('status', '!=', 'draft')->where('created_by', $user->id),
+            default  => $q->where('status', '!=', 'draft')->where('created_by', '!=', $user->id),
         };
-        return $q->paginate(25)->through(fn ($m) => [
-            'id' => $m->id, 'ref_no' => $m->ref_no, 'subject' => $m->subject, 'priority' => $m->priority,
-            'status' => $m->status, 'sent_at' => $m->sent_at, 'author' => $m->author,
-        ]);
+
+        $memos = $q->get();
+        $memoIds = $memos->pluck('id');
+
+        $unreadMemoIds = MemoRecipient::whereIn('memo_id', $memoIds)
+            ->where('user_id', $user->id)
+            ->whereNull('read_at')
+            ->pluck('memo_id')
+            ->flip();
+
+        $data = $memos->map(function ($m) use ($user, $unreadMemoIds) {
+            $author = $m->author;
+            $dept = $author?->unit?->department?->name ?? $author?->unit?->name ?? '';
+            $unread = $m->created_by !== $user->id && isset($unreadMemoIds[$m->id]);
+
+            return [
+                'id' => $m->id,
+                'ref_no' => $m->ref_no,
+                'subject' => $m->subject,
+                'priority' => $m->priority,
+                'status' => $m->status,
+                'sent_at' => $m->sent_at,
+                'unread' => $unread,
+                'author' => [
+                    'id' => $author?->id,
+                    'name' => $author?->name ?? '',
+                    'title' => $author?->title,
+                    'department' => $dept,
+                ],
+            ];
+        });
+
+        return response()->json(['data' => $data]);
     }
 
     public function store(Request $r, InitiateMemo $initiate, RoutingGuard $guard)
     {
+        $user = $r->user();
+
+        if ($r->input('kind') === 'template') {
+            abort_if(! $user->unit_id, 422, 'Account must belong to a unit to create a template memo.');
+
+            $d = $r->validate([
+                'subject' => 'required|string|max:255',
+                'routing_type' => 'nullable|in:internal_unit,peer,global',
+                'priority' => 'nullable|in:normal,urgent',
+                'page_count' => 'nullable|integer|min:1|max:500',
+                'page_dims' => 'nullable|array',
+                'template' => 'required|array',
+                'template.to' => 'required|string|filled',
+                'template.date' => ['required', 'date_format:Y-m-d'],
+            ]);
+
+            $routing = $d['routing_type'] ?? 'peer';
+            if ($routing === 'global') {
+                $guard->assertCanSend($user, 'global');
+            }
+
+            $user->loadMissing('unit.department');
+            $unit = $user->unit;
+            $dept = $unit?->department;
+
+            $template = $r->input('template', []);
+            $template['to'] = $template['to'];
+            $template['date'] = $template['date'];
+            $template['subject'] = $d['subject'];
+            $template['thru'] = isset($template['thru']) && is_array($template['thru']) ? array_values($template['thru']) : [];
+            $template['cc'] = isset($template['cc']) && is_array($template['cc']) ? array_values($template['cc']) : [];
+            $template['office_line'] = $template['office_line'] ?? '';
+            $template['body'] = $template['body'] ?? '';
+
+            // Overwrite fixed account presets - ignore client spoofed values
+            $template['from_name'] = $user->name;
+            $template['from_staff_no'] = $user->staff_no ?? '';
+            $template['department_name'] = $dept?->name ?? $unit?->name ?? '';
+            if ($dept?->id) {
+                $template['department_id'] = $dept->id;
+            }
+            $template['signature'] = [
+                'name' => $user->name,
+                'title' => $user->title ?? '',
+                'unit' => $unit?->name ?? '',
+            ];
+
+            $d['routing_type'] = $routing;
+            $memo = $initiate->handleTemplate($user, $d, $template);
+            return response()->json(['id' => $memo->id, 'ref_no' => $memo->ref_no], 201);
+        }
+
         $d = $r->validate([
             'subject' => 'required|string|max:255',
             'routing_type' => 'required|in:internal_unit,peer,global',
@@ -36,9 +122,72 @@ class MemoController extends Controller
             'page_count' => 'nullable|integer|min:1|max:500',
             'page_dims' => 'nullable|array',
         ]);
-        if ($d['routing_type'] === 'global') $guard->assertCanSend($r->user(), 'global');   // fail early
-        $memo = $initiate->handle($r->user(), $d, $r->file('file'));
-        return response(['id' => $memo->id, 'ref_no' => $memo->ref_no], 201);
+
+        if ($d['routing_type'] === 'global') {
+            $guard->assertCanSend($user, 'global');
+        }
+
+        $memo = $initiate->handle($user, $d, $r->file('file'));
+        return response()->json(['id' => $memo->id, 'ref_no' => $memo->ref_no], 201);
+    }
+
+    public function updateTemplate(Request $r, Memo $memo)
+    {
+        abort_if($memo->status !== 'draft' || $memo->created_by !== $r->user()->id, 403, 'Forbidden');
+
+        $d = $r->validate([
+            'subject' => 'sometimes|required|string|max:255',
+            'page_count' => 'nullable|integer|min:1|max:500',
+            'page_dims' => 'nullable|array',
+            'template' => 'nullable|array',
+        ]);
+
+        if (isset($d['subject'])) {
+            $memo->update(['subject' => $d['subject']]);
+        }
+
+        $doc = $memo->document;
+        if ($doc && $doc->kind === 'template') {
+            $existingTemplate = $doc->template_data ?? [];
+            $newTemplate = $r->input('template', []);
+
+            $u = $r->user()->loadMissing('unit.department');
+            $unit = $u->unit;
+            $dept = $unit?->department;
+
+            $merged = array_merge($existingTemplate, $newTemplate);
+            if (isset($d['subject'])) {
+                $merged['subject'] = $d['subject'];
+            }
+            $merged['from_name'] = $u->name;
+            $merged['from_staff_no'] = $u->staff_no ?? '';
+            $merged['department_name'] = $dept?->name ?? $unit?->name ?? '';
+            if ($dept?->id) {
+                $merged['department_id'] = $dept->id;
+            }
+            $merged['signature'] = [
+                'name' => $u->name,
+                'title' => $u->title ?? '',
+                'unit' => $unit?->name ?? '',
+            ];
+            if (isset($newTemplate['thru']) && is_array($newTemplate['thru'])) {
+                $merged['thru'] = array_values($newTemplate['thru']);
+            }
+            if (isset($newTemplate['cc']) && is_array($newTemplate['cc'])) {
+                $merged['cc'] = array_values($newTemplate['cc']);
+            }
+
+            $docUpdates = ['template_data' => $merged];
+            if (isset($d['page_count'])) {
+                $docUpdates['page_count'] = $d['page_count'];
+            }
+            if (array_key_exists('page_dims', $d)) {
+                $docUpdates['page_dims'] = $d['page_dims'];
+            }
+            $doc->update($docUpdates);
+        }
+
+        return response()->json(['status' => 'updated']);
     }
 
     public function send(Request $r, Memo $memo, SendMemo $send)
@@ -57,17 +206,40 @@ class MemoController extends Controller
         AuditLog::record($memo, $r->user(), 'memo.viewed', ['route_id' => $v['route']->id]);
 
         $doc = $memo->document;
-        $names = User::whereIn('id', collect($v['notes'])->pluck('author_id')
-            ->merge($v['replies']->pluck('author_id'))->merge($v['annotations']->pluck('author_id'))->unique())
-            ->get(['id', 'name', 'title', 'is_executive'])->keyBy('id');
+        $isTemplate = $doc && $doc->kind === 'template';
+
+        $minutes = Minute::where('memo_id', $memo->id)->orderBy('id')->get();
+        $minuteReplies = MinuteReply::whereIn('minute_id', $minutes->pluck('id'))->orderBy('id')->get();
+
+        $authorIds = collect($v['notes'])->pluck('author_id')
+            ->merge(collect($v['replies'])->pluck('author_id'))
+            ->merge(collect($v['annotations'])->pluck('author_id'))
+            ->merge($minutes->pluck('author_id'))
+            ->merge($minuteReplies->pluck('author_id'))
+            ->unique()
+            ->filter();
+
+        $names = User::whereIn('id', $authorIds)
+            ->get(['id', 'name', 'title', 'is_executive'])
+            ->keyBy('id');
 
         return [
             'memo' => $memo->only('id', 'ref_no', 'subject', 'priority', 'status', 'routing_type', 'created_by'),
             'route' => ['id' => $v['route']->id, 'kind' => $v['route']->kind, 'depth' => $v['route']->depth],
-            'document' => ['url' => url("/api/v1/memos/{$memo->id}/file"), 'mime' => $doc->mime,
-                           'page_count' => $doc->page_count, 'page_dims' => $doc->page_dims],
-            'annotations' => $v['annotations'], 'notes' => $v['notes'], 'replies' => $v['replies'],
-            'authors' => $names,
+            'document' => [
+                'url' => $isTemplate ? null : "/api/v1/memos/{$memo->id}/file",
+                'mime' => $doc?->mime ?? ($isTemplate ? 'application/json' : 'application/pdf'),
+                'page_count' => (int) ($doc?->page_count ?? 1),
+                'page_dims' => $doc?->page_dims,
+                'kind' => $isTemplate ? 'template' : 'file',
+                'template' => $isTemplate ? ($doc->template_data ?? null) : null,
+            ],
+            'annotations' => $v['annotations'],
+            'notes' => $v['notes'],
+            'replies' => $v['replies'],
+            'minutes' => $minutes,
+            'minuteReplies' => $minuteReplies,
+            'authors' => (object) $names->toArray(),
         ];
     }
 
@@ -76,6 +248,9 @@ class MemoController extends Controller
     {
         $vis->viewerRoute($memo, $r->user());
         $doc = $memo->document;
+        if (! $doc || $doc->kind === 'template') {
+            abort(404, 'No file exists for template memo.');
+        }
         return Storage::disk(config('filesystems.memo_disk', 'local'))->response($doc->storage_path, null, ['Content-Type' => $doc->mime]);
     }
 }

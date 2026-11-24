@@ -75,11 +75,10 @@ export default function MemoPage() {
       const pageCount = data.document.page_count || 1;
       const dims = Array(pageCount).fill({ w: A4.w, h: A4.h });
       setDoc({ 
-        type: 'template', 
         pageCount, 
         dims,
-        pages: []
-      } as LoadedDoc);
+        render: async () => {},
+      });
     } else if (data.document.url) {
       loadDocument(data.document.url, data.document.mime, data.document.page_dims).then(setDoc);
     }
