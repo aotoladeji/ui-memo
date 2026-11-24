@@ -3,3 +3,4 @@ dist
 vendor
 .env
 /api/storage/app
+database.sqlite

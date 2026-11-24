@@ -2,3 +2,4 @@
 /.env
 /storage/*.key
 .phpunit.result.cache
+database.sqlite
