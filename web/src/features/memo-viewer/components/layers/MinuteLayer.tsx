@@ -28,6 +28,7 @@ export function MinuteLayer({ page, width, height }: { page: number; width: numb
 }
 
 function MinuteText({ minute, width, height }: { minute: Minute; width: number; height: number }) {
+  const routeId = useEditor((s) => s.routeId);
   const activeMinuteId = useEditor((s) => s.activeMinuteId);
   const setActiveMinute = useEditor((s) => s.setActiveMinute);
   const moveMinute = useEditor((s) => s.moveMinute);
@@ -84,7 +85,7 @@ function MinuteText({ minute, width, height }: { minute: Minute; width: number; 
     if (!canDelete) return;
     if (!confirm('Delete this minute?')) return;
     try {
-      await api.delete(`/minutes/${minute.id}`);
+      await api.delete(`/minutes/${minute.id}`, { params: { route_id: routeId } });
       deleteMinute(minute.id);
     } catch (err) {
       alert('Failed to delete minute');
@@ -135,7 +136,7 @@ function MinuteText({ minute, width, height }: { minute: Minute; width: number; 
         
         const m = useEditor.getState().minutes[minute.id];
         try { 
-          await api.patch(`/minutes/${minute.id}`, { page_number: m.page_number, x: m.x, y: m.y }); 
+          await api.patch(`/minutes/${minute.id}`, { page_number: m.page_number, x: m.x, y: m.y, route_id: routeId });
         } catch { 
           moveMinute(minute.id, minute.page_number, d.ox, d.oy); // roll back
         }

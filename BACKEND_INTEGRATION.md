@@ -65,6 +65,9 @@ DB_DATABASE=ui_memo
 DB_USERNAME=root
 DB_PASSWORD=your_password
 
+# The checked-in .env.example uses SQLite for local development; set DB_CONNECTION=mysql here
+# for the MySQL setup below. PHPUnit uses an in-memory SQLite database.
+
 # Session & CORS
 SESSION_DRIVER=database
 SESSION_DOMAIN=localhost
@@ -130,6 +133,12 @@ In a separate terminal:
 
 ```bash
 php artisan queue:work
+```
+
+The send outbox is retried by `memos:retry-outbox`, scheduled every minute. Production must also run Laravel's scheduler every minute, for example:
+
+```cron
+* * * * * cd /path/to/ui-memo/api && php artisan schedule:run >> /dev/null 2>&1
 ```
 
 ---
@@ -206,12 +215,17 @@ The frontend will run at `http://localhost:5173`
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| GET | `/api/v1/memos` | List memos (inbox/sent/drafts) |
+| GET | `/api/v1/memos?box=inbox&page=1&per_page=20` | Paginated inbox, sent, or drafts |
 | POST | `/api/v1/memos` | Create new memo (template or upload) |
 | GET | `/api/v1/memos/:id` | View single memo |
 | POST | `/api/v1/memos/:id/send` | Send draft memo |
 | POST | `/api/v1/memos/:id/complete` | Mark memo as done |
 | GET | `/api/v1/memos/:id/file` | Download memo file |
+| PATCH | `/api/v1/memos/:id/template` | Update a template draft |
+| POST | `/api/v1/memos/:id/minutes` | Create a minute on the selected route |
+| POST | `/api/v1/minutes/:id/replies` | Reply to a visible minute |
+| PATCH | `/api/v1/minutes/:id` | Edit an authored, visible minute |
+| DELETE | `/api/v1/minutes/:id` | Delete an authored, visible minute |
 
 ### Forwarding
 
@@ -219,6 +233,14 @@ The frontend will run at `http://localhost:5173`
 |--------|----------|-------------|
 | POST | `/api/v1/memos/:id/forward` | Forward memo to recipients |
 | POST | `/api/v1/memos/:id/forward-preview` | Preview forward visibility |
+
+#### Response contracts
+
+Memo lists return `{data, meta, links}`. Each `data` row retains the existing memo fields and `unread`; `meta` contains `current_page`, `last_page`, `per_page`, `total`, `from`, and `to`. The default page size is 20 and the maximum is 100; values below 1 return 422. “Sent” contains authored non-draft memos.
+
+Forward preview returns recipient-specific visibility under `recipients`, with one entry per selected recipient: `{recipient_id, recipient, notes, annotations, replies, minutes, minute_replies}`. The top-level visibility arrays remain for backward compatibility and mirror the first selected recipient. A recipient sees only items allowed by the proposed route; branch-specific visibility may differ between recipients.
+
+Minutes and their replies are visible only on the same route or ancestor/descendant routes, subject to the minute's parent visibility rules; sibling branches are never visible to each other, even when the author holds both routes. An author's visibility override can bypass masks only on a related route path. Notes and annotations retain their existing visibility model.
 
 ### Annotations
 
@@ -231,8 +253,9 @@ The frontend will run at `http://localhost:5173`
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| POST | `/api/v1/notes` | Create sticky note |
+| POST | `/api/v1/memos/:id/notes` | Create sticky note |
 | PATCH | `/api/v1/notes/:id` | Update sticky note |
+| DELETE | `/api/v1/notes/:id` | Delete an authored note |
 | POST | `/api/v1/notes/:id/replies` | Reply to note |
 
 ### Users
@@ -240,7 +263,6 @@ The frontend will run at `http://localhost:5173`
 | Method | Endpoint | Description |
 |--------|----------|-------------|
 | GET | `/api/v1/users/search` | Search staff by name/number |
-| GET | `/api/v1/users/directory` | Get organization directory |
 
 ### Admin
 
@@ -249,6 +271,8 @@ The frontend will run at `http://localhost:5173`
 | GET | `/api/v1/admin/org` | Get organization structure |
 | POST | `/api/v1/admin/faculties` | Create faculty |
 | POST | `/api/v1/admin/departments` | Create department |
+| POST | `/api/v1/admin/departments/:id/logo` | Upload a department logo |
+| GET | `/api/v1/departments/:id/logo` | Read a department logo |
 | POST | `/api/v1/admin/units` | Create unit |
 | GET | `/api/v1/admin/users` | List all users |
 | POST | `/api/v1/admin/users` | Create new user |
@@ -345,6 +369,8 @@ Content-Type: application/json
 ```
 
 ### File Upload Memos (PDF/Image)
+
+The API and UI accept PDF, PNG, and JPEG files (maximum 20 MiB). Word documents (`.doc` and `.docx`) are not supported and must be exported to PDF before upload. Uploaded files are stored privately and streamed only after a recipient check; if memo persistence fails after storage, the API removes the uploaded file.
 
 **Request:**
 

@@ -42,6 +42,26 @@ describe('chain-of-custody masking (mock API mirrors Laravel ChainScoped)', () =
     await as('st002@ui.edu.ng'); expect(await noteIds()).not.toContain(note.id);
   });
 
+  it('keeps minutes and minute replies on their own sibling branch, even for the author', async () => {
+    await as('dvc01@ui.edu.ng');
+    const routeA = (await fwd([5])).data.forward_id;
+    const routeB = (await fwd([5])).data.forward_id;
+
+    await as('st001@ui.edu.ng');
+    const minute = (await api.post('/minutes', {
+      memo_id: 1, route_id: routeA, page_number: 1, x: 0.2, y: 0.2, body: 'Branch A minute',
+    })).data;
+    await api.post(`/minutes/${minute.id}/replies`, { route_id: routeA, body: 'Branch A reply' });
+
+    const branchA = (await api.get('/memos/1', { params: { route_id: routeA } })).data;
+    expect(branchA.minutes.map((item: { id: number }) => item.id)).toContain(minute.id);
+    expect(branchA.minuteReplies).toHaveLength(1);
+
+    const branchB = (await api.get('/memos/1', { params: { route_id: routeB } })).data;
+    expect(branchB.minutes.map((item: { id: number }) => item.id)).not.toContain(minute.id);
+    expect(branchB.minuteReplies).toHaveLength(0);
+  });
+
   it('returns 404 for non-recipients and 403 for global broadcast without the flag', async () => {
     await as('st002@ui.edu.ng');
     await expect(api.get('/memos/1')).rejects.toMatchObject({ response: { status: 404 } });

@@ -6,7 +6,11 @@ use App\Http\Controllers\Controller;
 use App\Models\{Department, Faculty, Unit};
 use App\Services\AdminScopeGuard;
 use Illuminate\Http\Request;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\Rule;
+use Throwable;
 
 /** Faculties: SuperAdmin only (route middleware). Departments/Units: SuperAdmin or in-scope Admin. */
 class OrgController extends Controller
@@ -28,35 +32,48 @@ class OrgController extends Controller
     // Departments
     public function storeDepartment(Request $r)
     {
-        abort_unless($r->user()->isSuperAdmin(), 403, 'Only SuperAdmin creates departments.');
         $d = $r->validate([
             'faculty_id' => 'required|exists:faculties,id',
             'name' => 'required|max:160',
-            'code' => 'required|max:20',
+            'code' => [
+                'required',
+                'max:20',
+                Rule::unique('departments', 'code')
+                    ->where('faculty_id', $r->input('faculty_id'))
+                    ->whereNull('deleted_at'),
+            ],
             'logo' => 'nullable|file|image|max:1024',
         ]);
 
-        $dept = Department::create(collect($d)->except('logo')->all());
+        abort_unless(
+            $this->scope->canFaculty($r->user(), (int) $d['faculty_id']),
+            403,
+            'You are not permitted to create departments in this faculty.'
+        );
 
-        if ($r->hasFile('logo')) {
-            $file = $r->file('logo');
-            $mime = $file->getMimeType() ?: $file->getClientMimeType();
-            $ext = match ($mime) {
-                'image/jpeg' => 'jpg',
-                'image/png' => 'png',
-                'image/gif' => 'gif',
-                'image/webp' => 'webp',
-                'image/svg+xml' => 'svg',
-                default => $file->guessExtension() ?: ($file->getClientOriginalExtension() ?: 'png'),
-            };
-            $path = $file->storeAs('logos', "dept_{$dept->id}.{$ext}", 'local');
-            $dept->update([
-                'has_logo' => true,
-                'logo_path' => $path,
-            ]);
+        $storedLogoPath = null;
+        try {
+            $dept = DB::transaction(function () use ($r, $d, &$storedLogoPath) {
+                $dept = Department::create(collect($d)->except('logo')->all());
+
+                if ($r->hasFile('logo')) {
+                    $storedLogoPath = $this->storeLogoFile($dept, $r->file('logo'));
+                    $dept->update([
+                        'has_logo' => true,
+                        'logo_path' => $storedLogoPath,
+                    ]);
+                }
+
+                return $dept;
+            });
+
+            return response($dept->fresh(), 201);
+        } catch (Throwable $e) {
+            if ($storedLogoPath && Storage::disk('local')->exists($storedLogoPath)) {
+                Storage::disk('local')->delete($storedLogoPath);
+            }
+            throw $e;
         }
-
-        return response($dept->fresh(), 201);
     }
 
     public function uploadLogo(Request $r, Department $department)
@@ -66,11 +83,30 @@ class OrgController extends Controller
             'logo' => 'required|file|image|max:1024',
         ]);
 
-        if ($department->logo_path && Storage::disk('local')->exists($department->logo_path)) {
-            Storage::disk('local')->delete($department->logo_path);
+        $oldPath = $department->logo_path;
+        $path = $this->storeLogoFile($department, $r->file('logo'));
+
+        try {
+            $department->update([
+                'has_logo' => true,
+                'logo_path' => $path,
+            ]);
+        } catch (Throwable $e) {
+            if ($path && Storage::disk('local')->exists($path)) {
+                Storage::disk('local')->delete($path);
+            }
+            throw $e;
         }
 
-        $file = $r->file('logo');
+        if ($oldPath && $oldPath !== $path && Storage::disk('local')->exists($oldPath)) {
+            Storage::disk('local')->delete($oldPath);
+        }
+
+        return response($department->fresh(), 200);
+    }
+
+    private function storeLogoFile(Department $department, UploadedFile $file): string
+    {
         $mime = $file->getMimeType() ?: $file->getClientMimeType();
         $ext = match ($mime) {
             'image/jpeg' => 'jpg',
@@ -80,14 +116,8 @@ class OrgController extends Controller
             'image/svg+xml' => 'svg',
             default => $file->guessExtension() ?: ($file->getClientOriginalExtension() ?: 'png'),
         };
-        $path = $file->storeAs('logos', "dept_{$department->id}.{$ext}", 'local');
 
-        $department->update([
-            'has_logo' => true,
-            'logo_path' => $path,
-        ]);
-
-        return response($department->fresh(), 200);
+        return $file->storeAs('logos', "dept_{$department->id}.{$ext}", 'local');
     }
 
     public function showLogo(Department $department)
@@ -111,7 +141,7 @@ class OrgController extends Controller
 
     public function destroyDepartment(Request $r, Department $department)
     {
-        abort_unless($r->user()->isSuperAdmin(), 403);
+        abort_unless($this->scope->canDepartment($r->user(), $department->id), 403);
         abort_if($department->units()->exists(), 409, 'Remove its units first.');
         if ($department->logo_path && Storage::disk('local')->exists($department->logo_path)) {
             Storage::disk('local')->delete($department->logo_path);

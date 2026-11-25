@@ -40,5 +40,5 @@ export interface UserLite { id: number; name: string; title?: string | null }
 export interface ForwardPayload {
   recipient_ids: number[]; message?: string; include_annotations: boolean;
   note_mode: 'all' | 'none'; hidden_classifications: Array<'executive' | 'confidential'>;
-  rules: { target_type: 'sticky_note' | 'annotation'; target_id: number; effect: 'include' | 'exclude' }[];
+  rules: { target_type: 'sticky_note' | 'annotation' | 'minute'; target_id: number; effect: 'include' | 'exclude' }[];
 }

@@ -11,8 +11,8 @@ class NoteController extends Controller
 {
     public function store(Request $r, Memo $memo, ChainVisibility $vis)
     {
-        $route = $vis->viewerRoute($memo, $r->user(), $r->integer('route_id') ?: null);
         $d = $r->validate([
+            'route_id' => 'nullable|integer|min:1',
             'page_number' => 'required|integer|min:1',
             'x' => 'required|numeric|between:0,1',
             'y' => 'required|numeric|between:0,1',
@@ -23,9 +23,11 @@ class NoteController extends Controller
             'requires_action' => 'boolean',
             'assigned_to' => 'nullable|integer|exists:users,id',
         ]);
+        $route = $vis->viewerRoute($memo, $r->user(), isset($d['route_id']) ? (int) $d['route_id'] : null);
         if (!empty($d['assigned_to'])) {   // assignee must hold the memo
             abort_unless(MemoRecipient::where(['memo_id' => $memo->id, 'user_id' => $d['assigned_to']])->exists(), 422, 'Assignee does not have this memo.');
         }
+        unset($d['route_id']);
         $note = StickyNote::create($d + [
             'memo_id' => $memo->id,
             'origin_route_id' => $route->id,
@@ -38,9 +40,8 @@ class NoteController extends Controller
     /** Move, edit, flag, or resolve. Author may edit/move; author or assignee may resolve. */
     public function update(Request $r, StickyNote $note, ChainVisibility $vis)
     {
-        $this->assertVisible($r, $note, $vis);
-        $isAuthor = $note->author_id === $r->user()->id;
         $d = $r->validate([
+            'route_id' => 'nullable|integer|min:1',
             'page_number' => 'integer|min:1',
             'x' => 'numeric|between:0,1',
             'y' => 'numeric|between:0,1',
@@ -48,6 +49,8 @@ class NoteController extends Controller
             'requires_action' => 'boolean',
             'status' => 'in:open,resolved',
         ]);
+        $this->assertVisible($r, $note, $vis, isset($d['route_id']) ? (int) $d['route_id'] : null);
+        $isAuthor = $note->author_id === $r->user()->id;
         $layout = array_intersect_key($d, array_flip(['page_number', 'x', 'y', 'body', 'requires_action']));
         abort_if(!empty($layout) && !$isAuthor, 403, 'Only the author can edit this note.');
         if (isset($d['status'])) {
@@ -64,7 +67,8 @@ class NoteController extends Controller
 
     public function destroy(Request $r, StickyNote $note, ChainVisibility $vis)
     {
-        $this->assertVisible($r, $note, $vis);
+        $d = $r->validate(['route_id' => 'nullable|integer|min:1']);
+        $this->assertVisible($r, $note, $vis, isset($d['route_id']) ? (int) $d['route_id'] : null);
         abort_unless($note->author_id === $r->user()->id, 403, 'Only the author can delete this note.');
         $note->delete();
         return response()->noContent();
@@ -72,9 +76,11 @@ class NoteController extends Controller
 
     public function reply(Request $r, StickyNote $note, ChainVisibility $vis)
     {
-        $memo = $this->assertVisible($r, $note, $vis);
-        $route = $vis->viewerRoute($memo, $r->user(), $r->integer('route_id') ?: null);
-        $d = $r->validate(['body' => 'required|string|max:5000']);
+        $d = $r->validate([
+            'route_id' => 'nullable|integer|min:1',
+            'body' => 'required|string|max:5000',
+        ]);
+        [, $route] = $this->assertVisible($r, $note, $vis, isset($d['route_id']) ? (int) $d['route_id'] : null);
         $rp = StickyNoteReply::create([
             'note_id' => $note->id,
             'origin_route_id' => $route->id,
@@ -85,11 +91,11 @@ class NoteController extends Controller
     }
 
     /** A note the user cannot see in their chain does not exist for them (404). */
-    private function assertVisible(Request $r, StickyNote $note, ChainVisibility $vis): Memo
+    private function assertVisible(Request $r, StickyNote $note, ChainVisibility $vis, ?int $routeId = null): array
     {
         $memo = Memo::findOrFail($note->memo_id);
-        $route = $vis->viewerRoute($memo, $r->user(), $r->integer('route_id') ?: null);
-        StickyNote::where('sticky_notes.id', $note->id)->visibleInChain($route->path, $r->user()->id)->firstOrFail();
-        return $memo;
+        $route = $vis->viewerRoute($memo, $r->user(), $routeId);
+        StickyNote::where('sticky_notes.id', $note->id)->whereNull('sticky_notes.deleted_at')->visibleInChain($route->path, $r->user()->id)->firstOrFail();
+        return [$memo, $route];
     }
 }

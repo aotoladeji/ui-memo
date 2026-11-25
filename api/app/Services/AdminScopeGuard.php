@@ -7,13 +7,37 @@ use App\Models\{Department, Unit, User};
 /** Decides whether a (scoped) Admin may touch an org node or a user. SuperAdmin may touch anything. */
 class AdminScopeGuard
 {
+    public function facultyIds(User $a): ?array   // null = unrestricted
+    {
+        if ($a->isSuperAdmin()) return null;
+        return $a->adminScopes()
+            ->where('scope_type', 'faculty')
+            ->pluck('faculty_id')
+            ->filter()
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->values()
+            ->all();
+    }
+
+    public function canFaculty(User $a, int $facultyId): bool
+    {
+        $ids = $this->facultyIds($a);
+        return $ids === null || in_array($facultyId, $ids, true);
+    }
+
     public function departmentIds(User $a): ?array   // null = unrestricted
     {
         if ($a->isSuperAdmin()) return null;
         $scopes = $a->adminScopes()->get();
-        $facIds = $scopes->where('scope_type', 'faculty')->pluck('faculty_id');
+        $facIds = $scopes->where('scope_type', 'faculty')->pluck('faculty_id')->filter();
         return Department::whereIn('faculty_id', $facIds)->pluck('id')
-            ->merge($scopes->where('scope_type', 'department')->pluck('department_id'))->unique()->values()->all();
+            ->merge($scopes->where('scope_type', 'department')->pluck('department_id'))
+            ->filter()
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->values()
+            ->all();
     }
 
     public function canDepartment(User $a, int $deptId): bool

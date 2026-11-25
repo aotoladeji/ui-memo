@@ -10,7 +10,24 @@ import { VisibilityFilter } from './VisibilityFilter';
 
 export interface ForwardModalProps { open: boolean; onClose: () => void; onForwarded: (forwardId: number) => void }
 
-interface Preview { notes: { id: number }[]; annotations: { id: number }[]; replies: { id: number }[] }
+interface RecipientPreview {
+  recipient_id: number;
+  recipient?: { id: number; name: string; title?: string | null };
+  notes: { id: number }[];
+  annotations: { id: number }[];
+  replies: { id: number }[];
+  minutes?: { id: number }[];
+  minute_replies?: { id: number }[];
+}
+
+interface Preview {
+  notes: { id: number }[];
+  annotations: { id: number }[];
+  replies: { id: number }[];
+  minutes?: { id: number }[];
+  minute_replies?: { id: number }[];
+  recipients?: RecipientPreview[];
+}
 
 export function ForwardModal({ open, onClose, onForwarded }: ForwardModalProps) {
   const me = useAuth((s) => s.me)!;
@@ -67,9 +84,25 @@ export function ForwardModal({ open, onClose, onForwarded }: ForwardModalProps) 
         </section>
 
         <p className="rounded-lg bg-brand-50 p-3 text-sm">Hidden items stay in the permanent record. The recipient, and anyone they forward to, will not see them.</p>
-        {preview && (
-          <p role="status" className="text-sm"><b>{to[0]?.name}</b> will see {preview.notes.length} note{preview.notes.length === 1 ? '' : 's'}, {preview.replies.length} repl{preview.replies.length === 1 ? 'y' : 'ies'} and {preview.annotations.length} drawing{preview.annotations.length === 1 ? '' : 's'}.</p>
-        )}
+        {preview && (() => {
+          const entries = preview.recipients?.length
+            ? preview.recipients
+            : [{ recipient_id: to[0]?.id ?? 0, recipient: to[0], notes: preview.notes, annotations: preview.annotations, replies: preview.replies, minutes: preview.minutes, minute_replies: preview.minute_replies }];
+          return (
+            <div role="status" className="space-y-1.5 rounded-lg border border-surface-line bg-surface p-3 text-sm">
+              {entries.map((entry) => {
+                const name = entry.recipient?.name || to.find((u) => u.id === entry.recipient_id)?.name || `User #${entry.recipient_id}`;
+                const minuteCount = entry.minutes?.length ?? 0;
+                const totalReplies = entry.replies.length + (entry.minute_replies?.length ?? 0);
+                return (
+                  <p key={entry.recipient_id}>
+                    <b>{name}</b> will see {entry.notes.length} note{entry.notes.length === 1 ? '' : 's'}, {totalReplies} repl{totalReplies === 1 ? 'y' : 'ies'}, {minuteCount} minute{minuteCount === 1 ? '' : 's'} and {entry.annotations.length} drawing{entry.annotations.length === 1 ? '' : 's'}.
+                  </p>
+                );
+              })}
+            </div>
+          );
+        })()}
         {err && <p role="alert" className="text-sm text-red-700">{err}</p>}
         <div className="flex justify-end gap-2">
           <button className="btn btn-ghost" disabled={!to.length || busy} onClick={() => run('preview')}>Preview as recipient</button>

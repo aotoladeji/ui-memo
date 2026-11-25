@@ -39,7 +39,9 @@ function viewerRoute(c: Ctx, memoId: number, routeId?: number): DRoute {
   const me = need(c);
   const rows = c.db.recipients.filter((r) => r.memo_id === memoId && r.user_id === me.id && (!routeId || r.route_id === routeId));
   if (!rows.length) throw new HttpError(404, 'Not found.');           // no existence leak
-  return c.db.routes.find((r) => r.id === rows[rows.length - 1].route_id)!;
+  const route = c.db.routes.find((r) => r.id === rows[rows.length - 1].route_id);
+  if (!route || route.memo_id !== memoId) throw new HttpError(404, 'Not found.');
+  return route;
 }
 const routeIdOf = (c: Ctx) => Number(c.body?.route_id ?? c.query?.route_id ?? 0) || undefined;
 
@@ -57,9 +59,7 @@ function memoShow(c: Ctx) {
   const row = db.recipients.filter((r) => r.memo_id === id && r.user_id === me.id && r.route_id === route.id)[0];
   if (row && !row.read_at) { row.read_at = new Date().toISOString(); persist(db); }
   const doc = db.docs.find((d) => d.memo_id === id)!;
-  const minutes = db.minutes.filter((m) => m.memo_id === id);
-  const minuteReplies = db.minuteReplies.filter((r) => minutes.some((m) => m.id === r.minute_id));
-  const authorIds = new Set([...v.notes.map((n) => n.author_id), ...v.replies.map((r) => r.author_id), ...v.annotations.map((a) => a.author_id), ...minutes.map((m) => m.author_id), ...minuteReplies.map((r) => r.author_id)]);
+  const authorIds = new Set([...v.notes.map((n) => n.author_id), ...v.replies.map((r) => r.author_id), ...v.annotations.map((a) => a.author_id), ...v.minutes.map((m) => m.author_id), ...v.minuteReplies.map((r) => r.author_id)]);
   const authors = Object.fromEntries(db.users.filter((u) => authorIds.has(u.id)).map((u) => [u.id, { id: u.id, name: u.name, title: u.title, is_executive: u.is_executive }]));
   return ok({
     memo: { id: memo!.id, ref_no: memo!.ref_no, subject: memo!.subject, priority: memo!.priority, status: memo!.status, routing_type: memo!.routing_type, created_by: memo!.created_by },
@@ -72,7 +72,7 @@ function memoShow(c: Ctx) {
       kind: doc.kind,
       template: doc.kind === 'template' ? doc.template : undefined
     },
-    annotations: v.annotations, notes: v.notes, replies: v.replies, minutes, minuteReplies, authors,
+    annotations: v.annotations, notes: v.notes, replies: v.replies, minutes: v.minutes, minuteReplies: v.minuteReplies, authors,
   });
 }
 
@@ -84,7 +84,7 @@ function forward(c: Ctx, dry: boolean) {
   assertCanSend(c, 'peer', ids);
   const seen = viewAt(db, memoId, parent.path, me.id);
   for (const r of b.rules ?? []) {
-    const pool = r.target_type === 'sticky_note' ? seen.notes : seen.annotations;
+    const pool = r.target_type === 'sticky_note' ? seen.notes : r.target_type === 'minute' ? seen.minutes : seen.annotations;
     if (!pool.some((x) => x.id === Number(r.target_id))) throw new HttpError(422, 'Invalid visibility target.');
   }
   const id = nextId(db, 'routes');
@@ -94,9 +94,29 @@ function forward(c: Ctx, dry: boolean) {
   const rules = (b.rules ?? []).map((r: any) => ({ route_id: id, target_type: r.target_type, target_id: Number(r.target_id), effect: r.effect }));
   db.rules.push(...rules);
   if (dry) {
-    const v = viewAt(db, memoId, route.path, ids[0]);
+    const recipients = ids.map((uid) => {
+      const v = viewAt(db, memoId, route.path, uid);
+      const u = db.users.find((x) => x.id === uid);
+      return {
+        recipient_id: uid,
+        recipient: { id: uid, name: u?.name ?? '', title: u?.title ?? null },
+        notes: v.notes,
+        annotations: v.annotations,
+        replies: v.replies,
+        minutes: v.minutes,
+        minute_replies: v.minuteReplies,
+      };
+    });
     db.routes.pop(); db.rules.splice(db.rules.length - rules.length, rules.length);
-    return ok({ notes: v.notes, annotations: v.annotations, replies: v.replies });
+    const first = recipients[0];
+    return ok({
+      notes: first.notes,
+      annotations: first.annotations,
+      replies: first.replies,
+      minutes: first.minutes,
+      minute_replies: first.minute_replies,
+      recipients,
+    });
   }
   for (const uid of ids) db.recipients.push({ id: nextId(db, 'recipients'), memo_id: memoId, route_id: id, user_id: uid, recipient_type: 'to', read_at: null, action_state: 'none' });
   persist(db);
@@ -126,14 +146,41 @@ on('get', '/users/search', (c) => {
 
 on('get', '/memos', (c) => {
   const me = need(c); const box = c.query.box ?? 'inbox'; const db = c.db;
+  const pageValue = c.query.page === undefined ? 1 : Number(c.query.page);
+  const perPageValue = c.query.per_page === undefined ? 20 : Number(c.query.per_page);
+  if (!Number.isInteger(pageValue) || pageValue < 1 || !Number.isInteger(perPageValue) || perPageValue < 1) {
+    throw new HttpError(422, 'Invalid pagination parameters.');
+  }
+  const page = pageValue;
+  const perPage = Math.min(100, perPageValue);
   const held = new Set(db.recipients.filter((r) => r.user_id === me.id).map((r) => r.memo_id));
-  const rows = db.memos.filter((m) => held.has(m.id) && (box === 'drafts' ? m.status === 'draft' && m.created_by === me.id : box === 'sent' ? m.status !== 'draft' && m.created_by === me.id : m.status !== 'draft' && m.created_by !== me.id))
+  const allRows = db.memos.filter((m) => held.has(m.id) && (box === 'drafts' ? m.status === 'draft' && m.created_by === me.id : box === 'sent' ? m.status !== 'draft' && m.created_by === me.id : m.status !== 'draft' && m.created_by !== me.id))
     .sort((a, b) => b.id - a.id).map((m) => {
       const a = db.users.find((u) => u.id === m.created_by)!;
       const unread = db.recipients.some((r) => r.memo_id === m.id && r.user_id === me.id && !r.read_at && m.created_by !== me.id);
       return { id: m.id, ref_no: m.ref_no, subject: m.subject, priority: m.priority, status: m.status, sent_at: m.sent_at, unread, author: { id: a.id, name: a.name, title: a.title } };
     });
-  return ok({ data: rows });
+  const total = allRows.length;
+  const lastPage = Math.max(1, Math.ceil(total / perPage));
+  const offset = (page - 1) * perPage;
+  const data = allRows.slice(offset, offset + perPage);
+  return ok({
+    data,
+    meta: {
+      current_page: page,
+      last_page: lastPage,
+      per_page: perPage,
+      total,
+      from: data.length ? offset + 1 : null,
+      to: data.length ? offset + data.length : null,
+    },
+    links: {
+      first: `/api/v1/memos?box=${box}&page=1&per_page=${perPage}`,
+      last: `/api/v1/memos?box=${box}&page=${lastPage}&per_page=${perPage}`,
+      prev: page > 1 ? `/api/v1/memos?box=${box}&page=${page - 1}&per_page=${perPage}` : null,
+      next: page < lastPage ? `/api/v1/memos?box=${box}&page=${page + 1}&per_page=${perPage}` : null,
+    },
+  });
 });
 on('post', '/memos', (c) => {
   const me = need(c); const db = c.db;
@@ -205,6 +252,12 @@ on('post', '/memos', (c) => {
     const file = fd.get('file');
     
     if (!subject || !(file instanceof Blob)) throw new HttpError(422, 'Validation failed.', { file: ['Choose a document.'] });
+    const allowedMimes = ['application/pdf', 'image/png', 'image/jpeg'];
+    if (file.type && !allowedMimes.includes(file.type)) {
+      throw new HttpError(422, 'Validation failed.', {
+        file: ['Only PDF, PNG, and JPEG files are supported. Word documents (.doc, .docx) are not supported and must be exported to PDF first.'],
+      });
+    }
     if (routing === 'global') assertCanSend(c, 'global', []);
     
     const id = nextId(db, 'memos'); 
@@ -215,27 +268,8 @@ on('post', '/memos', (c) => {
     
     const key = `up-${id}`;
     return (async () => {
-      let finalMime = file.type || 'application/pdf';
-      let finalBuffer = await file.arrayBuffer();
-      
-      // For Word documents in mock/demo mode, generate a PDF placeholder
-      // (In production, backend would convert Word to PDF)
-      const isWordDoc = file.type === 'application/msword' || 
-                        file.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
-      
-      if (isWordDoc) {
-        // Generate a placeholder PDF indicating this was a Word document
-        const { samplePdf } = await import('./pdf');
-        finalMime = 'application/pdf';
-        finalBuffer = samplePdf(subject, [
-          'This is a placeholder for an uploaded Word document.',
-          '',
-          `Original file: ${(file as File).name}`,
-          '',
-          'In production, Word documents are converted to PDF on the backend.',
-          'In demo mode, a placeholder PDF is shown instead.'
-        ]);
-      }
+      const finalMime = file.type || 'application/pdf';
+      const finalBuffer = await file.arrayBuffer();
       
       files.set(key, finalBuffer);
       db.memos.push({ 
@@ -254,8 +288,8 @@ on('post', '/memos', (c) => {
         memo_id: id, 
         kind: 'file',
         mime: finalMime, 
-        page_count: isWordDoc ? 2 : Number(fd.get('page_count') ?? 1), 
-        page_dims: isWordDoc ? null : (dims.length ? dims : null), 
+        page_count: Number(fd.get('page_count') ?? 1),
+        page_dims: dims.length ? dims : null,
         file_key: key,
         template: undefined
       });
@@ -375,7 +409,7 @@ on('post', '/minutes', (c) => {
   const m = { 
     id: nextId(c.db, 'minutes'), 
     memo_id: id, 
-    origin_route_id: route.id, 
+    origin_route_id: route.id,
     author_id: me.id, 
     page_number: Number(b.page_number), 
     x: Number(b.x), 
@@ -390,18 +424,20 @@ on('post', '/minutes', (c) => {
   return created(m);
 });
 on('post', '/minutes/:id/replies', (c) => {
-  const me = need(c); const m = c.db.minutes.find((x) => x.id === Number(c.params.id));
+  const me = need(c); const m = (c.db.minutes ?? []).find((x) => x.id === Number(c.params.id));
   if (!m) throw new HttpError(404, 'Not found.');
+  const route = viewerRoute(c, m.memo_id, routeIdOf(c));
+  if (!viewAt(c.db, m.memo_id, route.path, me.id).minutes.some((x) => x.id === m.id)) throw new HttpError(404, 'Not found.');
   val(c, { body: 'Write a reply.' });
   const rp = { 
     id: nextId(c.db, 'minuteReplies'), 
     minute_id: m.id, 
-    origin_route_id: m.origin_route_id, 
+    origin_route_id: route.id,
     author_id: me.id, 
     body: String(c.body.body), 
     created_at: new Date().toISOString() 
   };
-  c.db.minuteReplies.push(rp); 
+  c.db.minuteReplies.push(rp);
   persist(c.db); 
   return created(rp);
 });

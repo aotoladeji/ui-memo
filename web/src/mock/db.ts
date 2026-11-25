@@ -13,7 +13,7 @@ export interface DNote { id: number; memo_id: number; origin_route_id: number; a
 export interface DReply { id: number; note_id: number; origin_route_id: number; author_id: number; body: string; created_at: string }
 export interface DMinute { id: number; memo_id: number; origin_route_id: number; author_id: number; page_number: number; x: number; y: number; body: string; color: string; classification: Cls; created_at: string }
 export interface DMinuteReply { id: number; minute_id: number; origin_route_id: number; author_id: number; body: string; created_at: string }
-export interface DRule { route_id: number; target_type: 'sticky_note' | 'annotation'; target_id: number; effect: 'include' | 'exclude' }
+export interface DRule { route_id: number; target_type: 'sticky_note' | 'annotation' | 'minute'; target_id: number; effect: 'include' | 'exclude' }
 export interface DB {
   seq: Record<string, number>;
   faculties: { id: number; name: string; code: string }[]; departments: { id: number; faculty_id: number; name: string; code: string }[]; units: { id: number; department_id: number; name: string; code: string }[];

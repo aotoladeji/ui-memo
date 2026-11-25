@@ -83,23 +83,27 @@ export default function ComposePage() {
           } })).data.id;
       } else {
         if (!file) return;
-        const m = await measureFile(file); 
+        const allowedTypes = new Set(['application/pdf', 'image/png', 'image/jpeg']);
+        if (!allowedTypes.has(file.type)) {
+          setErr('Only PDF, PNG, and JPEG files are supported. Word documents (.doc, .docx) must be exported to PDF first.');
+          setBusy(false);
+          return;
+        }
+        const m = await measureFile(file);
         const fd = new FormData();
-        fd.append('subject', f.subject); 
-        fd.append('routing_type', routing); 
-        fd.append('priority', priority); 
-        fd.append('file', file); 
-        
-        // Only include dimensions if client-side measurement succeeded
-        // For Word docs, backend will determine dimensions after conversion
+        fd.append('subject', f.subject);
+        fd.append('routing_type', routing);
+        fd.append('priority', priority);
+        fd.append('file', file);
+
         if (m) {
           fd.append('page_count', String(m.pageCount));
-          m.dims.forEach((d, i) => { 
-            fd.append(`page_dims[${i}][w]`, String(d.w)); 
-            fd.append(`page_dims[${i}][h]`, String(d.h)); 
+          m.dims.forEach((d, i) => {
+            fd.append(`page_dims[${i}][w]`, String(d.w));
+            fd.append(`page_dims[${i}][h]`, String(d.h));
           });
         }
-        
+
         id = (await api.post('/memos', fd)).data.id;
       }
       nav(`/memos/${id}`);
@@ -118,7 +122,7 @@ export default function ComposePage() {
       <h1 className="mb-4 text-xl font-bold">New memo</h1>
       <div role="tablist" aria-label="Memo format" className="mb-5 flex flex-col gap-3 sm:flex-row">
         {tab('template', 'Use the university memo template', 'Official letterhead. Write the text; the header is filled in for you.', FileText)}
-        {tab('upload', 'Upload a document', 'PDF, Word (.doc, .docx), or image (up to 20 MB).', Upload)}
+        {tab('upload', 'Upload a document', 'PDF, PNG, or JPEG image (up to 20 MB).', Upload)}
       </div>
 
       <div className={`grid gap-6 ${mode === 'template' ? 'lg:grid-cols-[minmax(0,1fr)_420px]' : 'max-w-xl'}`}>
@@ -134,8 +138,19 @@ export default function ComposePage() {
           ) : (
             <>
               <label className="block text-sm font-bold">Subject<input className="field mt-1" value={f.subject} onChange={(e) => setF({ ...f, subject: e.target.value })} required maxLength={255} /></label>
-              <label className="block text-sm font-bold">Document (PDF, Word, or image, up to 20 MB)
-                <input className="field mt-1" type="file" accept="application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,image/png,image/jpeg" onChange={(e) => setFile(e.target.files?.[0] ?? null)} required /></label>
+              <label className="block text-sm font-bold">Document (PDF, PNG, or JPG, up to 20 MB)
+                <input className="field mt-1" type="file" accept="application/pdf,image/png,image/jpeg,.pdf,.png,.jpg,.jpeg" onChange={(e) => {
+                  const chosen = e.target.files?.[0] ?? null;
+                  if (chosen && !['application/pdf', 'image/png', 'image/jpeg'].includes(chosen.type)) {
+                    setErr('Only PDF, PNG, and JPEG files are supported. Word documents (.doc, .docx) must be exported to PDF first.');
+                    setFile(null);
+                    e.target.value = '';
+                    return;
+                  }
+                  setErr('');
+                  setFile(chosen);
+                }} required /></label>
+              <p className="text-xs text-ink-soft">Word documents (.doc, .docx) are not supported directly — please export to PDF first.</p>
               <div className="rounded-lg border border-blue-200 bg-blue-50 p-4">
                 <div className="flex items-start gap-3">
                   <div className="rounded-full bg-blue-600 px-2 py-1 text-xs font-bold text-white">

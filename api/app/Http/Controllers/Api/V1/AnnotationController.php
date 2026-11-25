@@ -12,8 +12,8 @@ class AnnotationController extends Controller
     /** Batch upsert for debounced autosave. Returns client_id => id so the UI can swap temp ids. */
     public function sync(Request $r, Memo $memo, ChainVisibility $vis)
     {
-        $route = $vis->viewerRoute($memo, $r->user(), $r->integer('route_id') ?: null);
         $d = $r->validate([
+            'route_id' => 'nullable|integer|min:1',
             'items' => 'required|array|max:200',
             'items.*.client_id' => 'required|string|max:64',
             'items.*.id' => 'nullable|integer',
@@ -24,6 +24,7 @@ class AnnotationController extends Controller
             'items.*.classification' => 'nullable|in:standard,executive,confidential',
             'items.*.z_index' => 'nullable|integer',
         ]);
+        $route = $vis->viewerRoute($memo, $r->user(), isset($d['route_id']) ? (int) $d['route_id'] : null);
 
         $map = [];
         foreach ($d['items'] as $it) {
@@ -52,8 +53,13 @@ class AnnotationController extends Controller
 
     public function destroy(Request $r, Annotation $annotation, ChainVisibility $vis)
     {
+        $d = $r->validate(['route_id' => 'nullable|integer|min:1']);
         $memo = Memo::findOrFail($annotation->memo_id);
-        $vis->viewerRoute($memo, $r->user(), $r->integer('route_id') ?: null);
+        $route = $vis->viewerRoute($memo, $r->user(), isset($d['route_id']) ? (int) $d['route_id'] : null);
+        Annotation::where('annotations.id', $annotation->id)
+            ->whereNull('annotations.deleted_at')
+            ->visibleInChain($route->path, $r->user()->id)
+            ->firstOrFail();
         abort_unless($annotation->author_id === $r->user()->id, 403, 'Only the author can delete this annotation.');
         $annotation->delete();                      // soft delete: audit trail preserved
         return response()->noContent();

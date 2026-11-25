@@ -2,12 +2,13 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\ChainScoped;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Minute extends Model
 {
-    use SoftDeletes;
+    use ChainScoped, SoftDeletes;
 
     protected $fillable = [
         'memo_id',

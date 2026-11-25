@@ -153,4 +153,32 @@ class ChainVisibilityTest extends TestCase
         Sanctum::actingAs($this->dvc);
         $this->patchJson("/api/v1/admin/users/{$this->staff->id}/permissions", ['can_send_global_broadcast' => true])->assertForbidden();
     }
+
+    public function test_visibility_query_supports_configured_sqlite_and_generates_mysql_compatible_sql(): void
+    {
+        // Configured SQLite connection executes natively without UDF crutches
+        $this->assertSame('sqlite', \DB::connection()->getDriverName());
+        $exec = $this->note($this->vc, $this->origin, 'executive');
+        $hop1 = $this->route($this->origin, $this->dvc, 'forward', ['hidden_classifications' => ['executive']]);
+        $this->recipient($hop1, $this->staff);
+        $this->assertNotContains($exec->id, $this->noteIdsFor($this->staff));
+
+        // Verify MySQL SQL generation path produces CONCAT + JSON_CONTAINS
+        $mysqlConn = \Mockery::mock(\Illuminate\Database\Connection::class);
+        $mysqlConn->shouldReceive('getDriverName')->andReturn('mysql');
+        $mysqlConn->shouldReceive('getQueryGrammar')->andReturn(new \Illuminate\Database\Query\Grammars\MySqlGrammar($mysqlConn));
+        $mysqlConn->shouldReceive('getPostProcessor')->andReturn(new \Illuminate\Database\Query\Processors\MySqlProcessor());
+
+        $query = new \Illuminate\Database\Query\Builder(
+            $mysqlConn,
+            $mysqlConn->getQueryGrammar(),
+            $mysqlConn->getPostProcessor()
+        );
+        $eloquent = (new StickyNote())->newModelQuery()->setQuery($query->from('sticky_notes'));
+        $sql = $eloquent->visibleInChain('/1/2/', 5)->toSql();
+
+        $this->assertStringContainsString('CONCAT(o.path', $sql);
+        $this->assertStringContainsString('JSON_CONTAINS(', $sql);
+        $this->assertStringContainsString('JSON_QUOTE(', $sql);
+    }
 }

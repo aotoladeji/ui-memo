@@ -11,10 +11,20 @@ use Illuminate\Support\Facades\Storage;
 
 class MemoController extends Controller
 {
+    private const DEFAULT_PER_PAGE = 20;
+    private const MAX_PER_PAGE = 100;
+
     public function index(Request $r)
     {
+        $d = $r->validate([
+            'box' => 'nullable|in:inbox,sent,drafts',
+            'page' => 'nullable|integer|min:1',
+            'per_page' => 'nullable|integer|min:1',
+        ]);
+
         $user = $r->user();
-        $box = $r->query('box', 'inbox');
+        $box = $d['box'] ?? 'inbox';
+        $perPage = min(self::MAX_PER_PAGE, max(1, (int) ($d['per_page'] ?? self::DEFAULT_PER_PAGE)));
 
         $q = Memo::visibleTo($user)
             ->with(['author.unit.department'])
@@ -26,14 +36,17 @@ class MemoController extends Controller
             default  => $q->where('status', '!=', 'draft')->where('created_by', '!=', $user->id),
         };
 
-        $memos = $q->get();
+        $paginator = $q->paginate($perPage);
+        $memos = $paginator->getCollection();
         $memoIds = $memos->pluck('id');
 
-        $unreadMemoIds = MemoRecipient::whereIn('memo_id', $memoIds)
-            ->where('user_id', $user->id)
-            ->whereNull('read_at')
-            ->pluck('memo_id')
-            ->flip();
+        $unreadMemoIds = $memoIds->isEmpty()
+            ? collect()
+            : MemoRecipient::whereIn('memo_id', $memoIds)
+                ->where('user_id', $user->id)
+                ->whereNull('read_at')
+                ->pluck('memo_id')
+                ->flip();
 
         $data = $memos->map(function ($m) use ($user, $unreadMemoIds) {
             $author = $m->author;
@@ -55,9 +68,25 @@ class MemoController extends Controller
                     'department' => $dept,
                 ],
             ];
-        });
+        })->values();
 
-        return response()->json(['data' => $data]);
+        return response()->json([
+            'data' => $data,
+            'meta' => [
+                'current_page' => $paginator->currentPage(),
+                'last_page' => $paginator->lastPage(),
+                'per_page' => $paginator->perPage(),
+                'total' => $paginator->total(),
+                'from' => $paginator->firstItem(),
+                'to' => $paginator->lastItem(),
+            ],
+            'links' => [
+                'first' => $paginator->url(1),
+                'last' => $paginator->url($paginator->lastPage()),
+                'prev' => $paginator->previousPageUrl(),
+                'next' => $paginator->nextPageUrl(),
+            ],
+        ]);
     }
 
     public function store(Request $r, InitiateMemo $initiate, RoutingGuard $guard)
@@ -118,9 +147,14 @@ class MemoController extends Controller
             'subject' => 'required|string|max:255',
             'routing_type' => 'required|in:internal_unit,peer,global',
             'priority' => 'nullable|in:normal,urgent',
-            'file' => 'required|file|mimes:pdf,png,jpg,jpeg|max:20480',
+            'file' => 'required|file|mimetypes:application/pdf,image/png,image/jpeg|mimes:pdf,png,jpg,jpeg|max:20480',
             'page_count' => 'nullable|integer|min:1|max:500',
             'page_dims' => 'nullable|array',
+            'page_dims.*.w' => 'required_with:page_dims|numeric|min:1',
+            'page_dims.*.h' => 'required_with:page_dims|numeric|min:1',
+        ], [
+            'file.mimes' => 'Only PDF, PNG, and JPEG files are supported. Word documents (.doc, .docx) are not supported and must be exported to PDF first.',
+            'file.mimetypes' => 'Only PDF, PNG, and JPEG files are supported. Word documents (.doc, .docx) are not supported and must be exported to PDF first.',
         ]);
 
         if ($d['routing_type'] === 'global') {
@@ -197,10 +231,11 @@ class MemoController extends Controller
         return ['status' => 'sent'];
     }
 
-    /** Memo + FILTERED annotations/notes/replies for this viewer. Masked items are never serialised. */
+    /** Memo + FILTERED annotations/notes/replies/minutes/minuteReplies for this viewer. Masked items are never serialised. */
     public function show(Request $r, Memo $memo, ChainVisibility $vis)
     {
-        $v = $vis->view($memo, $r->user(), $r->integer('route_id') ?: null);   // 404 if not a recipient
+        $d = $r->validate(['route_id' => 'nullable|integer|min:1']);
+        $v = $vis->view($memo, $r->user(), isset($d['route_id']) ? (int) $d['route_id'] : null);   // 404 if not a recipient
         MemoRecipient::where(['memo_id' => $memo->id, 'user_id' => $r->user()->id, 'route_id' => $v['route']->id])
             ->whereNull('read_at')->update(['read_at' => now()]);
         AuditLog::record($memo, $r->user(), 'memo.viewed', ['route_id' => $v['route']->id]);
@@ -208,14 +243,11 @@ class MemoController extends Controller
         $doc = $memo->document;
         $isTemplate = $doc && $doc->kind === 'template';
 
-        $minutes = Minute::where('memo_id', $memo->id)->orderBy('id')->get();
-        $minuteReplies = MinuteReply::whereIn('minute_id', $minutes->pluck('id'))->orderBy('id')->get();
-
         $authorIds = collect($v['notes'])->pluck('author_id')
             ->merge(collect($v['replies'])->pluck('author_id'))
             ->merge(collect($v['annotations'])->pluck('author_id'))
-            ->merge($minutes->pluck('author_id'))
-            ->merge($minuteReplies->pluck('author_id'))
+            ->merge(collect($v['minutes'])->pluck('author_id'))
+            ->merge(collect($v['minute_replies'])->pluck('author_id'))
             ->unique()
             ->filter();
 
@@ -237,8 +269,8 @@ class MemoController extends Controller
             'annotations' => $v['annotations'],
             'notes' => $v['notes'],
             'replies' => $v['replies'],
-            'minutes' => $minutes,
-            'minuteReplies' => $minuteReplies,
+            'minutes' => $v['minutes'],
+            'minuteReplies' => $v['minute_replies'],
             'authors' => (object) $names->toArray(),
         ];
     }
@@ -246,7 +278,8 @@ class MemoController extends Controller
     /** Streams the original, only after the recipient check. Swap for an S3 temporaryUrl in production. */
     public function file(Request $r, Memo $memo, ChainVisibility $vis)
     {
-        $vis->viewerRoute($memo, $r->user());
+        $d = $r->validate(['route_id' => 'nullable|integer|min:1']);
+        $vis->viewerRoute($memo, $r->user(), isset($d['route_id']) ? (int) $d['route_id'] : null);
         $doc = $memo->document;
         if (! $doc || $doc->kind === 'template') {
             abort(404, 'No file exists for template memo.');

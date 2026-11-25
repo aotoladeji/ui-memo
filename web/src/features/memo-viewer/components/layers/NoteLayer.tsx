@@ -28,6 +28,7 @@ export function NoteLayer({ page, width, height }: { page: number; width: number
 }
 
 function NotePin({ note, width, height }: { note: Note; width: number; height: number }) {
+  const routeId = useEditor((s) => s.routeId);
   const activeNoteId = useEditor((s) => s.activeNoteId);
   const setActive = useEditor((s) => s.setActive);
   const moveNote = useEditor((s) => s.moveNote);
@@ -72,7 +73,7 @@ function NotePin({ note, width, height }: { note: Note; width: number; height: n
     if (!canDelete) return;
     if (!confirm('Delete this note?')) return;
     try {
-      await api.delete(`/notes/${note.id}`);
+      await api.delete(`/notes/${note.id}`, { params: { route_id: routeId } });
       deleteNote(note.id);
     } catch (err) {
       alert('Failed to delete note');
@@ -102,7 +103,7 @@ function NotePin({ note, width, height }: { note: Note; width: number; height: n
         if (!d.moved) return setActive(note.id);
         if (!canMove) return;
         const n = useEditor.getState().notes[note.id];
-        try { await api.patch(`/notes/${note.id}`, { page_number: n.page_number, x: n.x, y: n.y }); }
+        try { await api.patch(`/notes/${note.id}`, { page_number: n.page_number, x: n.x, y: n.y, route_id: routeId }); }
         catch { moveNote(note.id, note.page_number, d.ox, d.oy); }   // roll back
       }}
       onClick={(e) => {

@@ -35,6 +35,12 @@ make queue                   # queue worker (needed for "My unit only" and "All 
 cd web && npm run dev:api    # http://localhost:5173   (the app, talking to the real API)
 ```
 
+Production must run the Laravel scheduler every minute as well as a queue worker; the scheduler retries pending recipient fan-out outbox records:
+
+```cron
+* * * * * cd /path/to/ui-memo/api && php artisan schedule:run >> /dev/null 2>&1
+```
+
 Sign in at http://localhost:5173 with `sa001@ui.edu.ng` / `ChangeMe#2026`.
 Other demo users: `vc001`, `dvc01`, `hd001`, `st001`, `st002` (all `@ui.edu.ng`, same password).
 Run the backend tests with `make test`.

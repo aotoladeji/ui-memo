@@ -3,10 +3,14 @@ import { Link } from 'react-router-dom';
 import { FilePlus2 } from 'lucide-react';
 import { api, errorText } from '@/shared/api';
 import { useDocumentTitle } from '@/shared/useDocumentTitle';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
 interface Row { id: number; ref_no: string; subject: string; priority: string; status: string; unread?: boolean; author: { name: string; title?: string | null; department?: string | null } }
+interface PaginationMeta { current_page: number; last_page: number; per_page: number; total: number; from: number | null; to: number | null }
+interface PaginatedMemos { data: Row[]; meta?: PaginationMeta }
 export type Box = 'inbox' | 'sent' | 'drafts';
+
+const PER_PAGE = 20;
 
 const COPY: Record<Box, { title: string; empty: string }> = {
   inbox: { title: 'Inbox', empty: 'No memos for you yet.' },
@@ -41,8 +45,21 @@ function categorizeRow(row: Row): Category {
 export default function MemoListPage({ box }: { box: Box }) {
   useDocumentTitle(COPY[box].title);
   const [activeCategory, setActiveCategory] = useState<Category>('all');
-  const { data, isLoading, error } = useQuery({ queryKey: ['memos', box], queryFn: async () => (await api.get<{ data: Row[] }>('/memos', { params: { box } })).data.data });
-  
+  const [page, setPage] = useState(1);
+
+  useEffect(() => {
+    setPage(1);
+    setActiveCategory('all');
+  }, [box]);
+
+  const { data: res, isLoading, error } = useQuery({
+    queryKey: ['memos', box, page],
+    queryFn: async () => (await api.get<PaginatedMemos>('/memos', { params: { box, page, per_page: PER_PAGE } })).data,
+  });
+
+  const data = res?.data;
+  const meta = res?.meta;
+
   const filteredData = data?.filter((m) => {
     if (activeCategory === 'all') return true;
     return categorizeRow(m) === activeCategory;
@@ -93,6 +110,32 @@ export default function MemoListPage({ box }: { box: Box }) {
             </Link></li>
           ))}
         </ul>
+      )}
+
+      {meta && meta.last_page > 1 && (
+        <nav aria-label="Memo pagination" className="mt-4 flex items-center justify-between border-t border-surface-line pt-3 text-sm">
+          <span className="text-ink-soft">
+            Page {meta.current_page} of {meta.last_page} ({meta.total} total)
+          </span>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              className="btn btn-ghost"
+              disabled={meta.current_page <= 1 || isLoading}
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+            >
+              Previous
+            </button>
+            <button
+              type="button"
+              className="btn btn-ghost"
+              disabled={meta.current_page >= meta.last_page || isLoading}
+              onClick={() => setPage((p) => Math.min(meta.last_page, p + 1))}
+            >
+              Next
+            </button>
+          </div>
+        </nav>
       )}
     </div>
   );

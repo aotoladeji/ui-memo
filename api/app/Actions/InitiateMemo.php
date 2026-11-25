@@ -5,56 +5,73 @@ namespace App\Actions;
 use App\Models\{AuditLog, Memo, MemoDocument, MemoRecipient, MemoRoute, User};
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use RuntimeException;
+use Throwable;
 
 class InitiateMemo
 {
     /** Creates a draft for file upload: memo + document + origin hop + author recipient row. */
     public function handle(User $u, array $in, UploadedFile $file): Memo
     {
-        return DB::transaction(function () use ($u, $in, $file) {
-            $path = $file->store('memos/' . now()->format('Y/m'), config('filesystems.memo_disk', 'local'));
+        $disk = config('filesystems.memo_disk', 'local');
+        $path = $file->store('memos/' . now()->format('Y/m'), $disk);
+        if (! $path) {
+            throw new RuntimeException('Failed to store uploaded memo file.');
+        }
 
-            $memo = Memo::create([
-                'uuid' => (string) Str::uuid(),
-                'ref_no' => $this->refNo($u),
-                'subject' => $in['subject'],
-                'created_by' => $u->id,
-                'origin_unit_id' => $u->unit_id,
-                'routing_type' => $in['routing_type'] ?? 'peer',
-                'priority' => $in['priority'] ?? 'normal',
-                'status' => 'draft',
-            ]);
+        $realPath = $file->getRealPath();
+        $sha256 = $realPath && is_file($realPath)
+            ? hash_file('sha256', $realPath)
+            : hash('sha256', (string) Storage::disk($disk)->get($path));
 
-            MemoDocument::create([
-                'memo_id' => $memo->id,
-                'kind' => 'file',
-                'storage_path' => $path,
-                'mime' => $file->getMimeType(),
-                'page_count' => (int) ($in['page_count'] ?? 1),
-                'page_dims' => $in['page_dims'] ?? null,         // client sends measured pdf.js sizes
-                'sha256' => hash_file('sha256', $file->getRealPath()),
-            ]);
+        try {
+            return DB::transaction(function () use ($u, $in, $file, $path, $sha256) {
+                $memo = Memo::create([
+                    'uuid' => (string) Str::uuid(),
+                    'ref_no' => $this->refNo($u),
+                    'subject' => $in['subject'],
+                    'created_by' => $u->id,
+                    'origin_unit_id' => $u->unit_id,
+                    'routing_type' => $in['routing_type'] ?? 'peer',
+                    'priority' => $in['priority'] ?? 'normal',
+                    'status' => 'draft',
+                ]);
 
-            $route = MemoRoute::create([
-                'memo_id' => $memo->id,
-                'depth' => 0,
-                'path' => '',
-                'kind' => 'origin',
-                'from_user_id' => $u->id,
-            ]);
-            $route->update(['path' => "/{$route->id}/"]);
+                MemoDocument::create([
+                    'memo_id' => $memo->id,
+                    'kind' => 'file',
+                    'storage_path' => $path,
+                    'mime' => $file->getMimeType() ?: $file->getClientMimeType(),
+                    'page_count' => (int) ($in['page_count'] ?? 1),
+                    'page_dims' => $in['page_dims'] ?? null,         // client sends measured pdf.js sizes
+                    'sha256' => $sha256,
+                ]);
 
-            MemoRecipient::create([
-                'memo_id' => $memo->id,
-                'route_id' => $route->id,
-                'user_id' => $u->id,
-                'recipient_type' => 'author',
-                'delivered_at' => now(),
-            ]);
-            AuditLog::record($memo, $u, 'memo.created');
-            return $memo;
-        });
+                $route = MemoRoute::create([
+                    'memo_id' => $memo->id,
+                    'depth' => 0,
+                    'path' => '',
+                    'kind' => 'origin',
+                    'from_user_id' => $u->id,
+                ]);
+                $route->update(['path' => "/{$route->id}/"]);
+
+                MemoRecipient::create([
+                    'memo_id' => $memo->id,
+                    'route_id' => $route->id,
+                    'user_id' => $u->id,
+                    'recipient_type' => 'author',
+                    'delivered_at' => now(),
+                ]);
+                AuditLog::record($memo, $u, 'memo.created');
+                return $memo;
+            });
+        } catch (Throwable $e) {
+            Storage::disk($disk)->delete($path);
+            throw $e;
+        }
     }
 
     /** Creates a draft for template memo: memo + document + origin hop + author recipient row. */
