@@ -111,10 +111,10 @@ php artisan migrate
 ### Step 6: Seed Demo Data (Optional)
 
 ```bash
-php artisan db:seed --class=DemoSeeder
+php artisan db:seed --class=DatabaseSeeder
 ```
 
-This creates demo users:
+This imports the faculty/department CSV data and creates demo users:
 - **Super Admin**: SA001@ui.edu.ng / ChangeMe#2026
 - **Vice-Chancellor**: VC001@ui.edu.ng / ChangeMe#2026
 - **Staff**: ST001@ui.edu.ng / ChangeMe#2026
@@ -411,6 +411,20 @@ public function store(Request $request)
 ## Database Schema
 
 ### Key Tables
+
+#### `faculties`
+- `id` (PK)
+- `name`
+- `code` (unique; imported records use stable `CSV-F-<source faculty_id>` values)
+
+#### `departments`
+- `id` (PK)
+- `faculty_id` (FK → `faculties.id`, one faculty has many departments)
+- `name`
+- `code` (unique within the faculty; imported records use stable `CSV-D-<source department_id>` values)
+- `dept_category`
+
+`DatabaseSeeder` imports the 33 faculty and 175 department rows from `api/database/seeders/data/`. The source department `faculty_id` is mapped to the matching faculty record; `FacultyDepartmentSeeder` can be run alone to import or refresh these organization records.
 
 #### `users`
 - `id` (PK)

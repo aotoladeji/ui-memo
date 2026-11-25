@@ -11,6 +11,7 @@ The repository contains a runnable Laravel API in `api/`, the React client in `w
 - Sending locks and conditionally updates the draft, and commits the sent state, audit event, and unique outbox record together. Recipient fan-out is idempotent and retryable; `memos:retry-outbox` is scheduled once per minute.
 - Forward preview returns per-recipient results. Its legacy top-level visibility arrays remain the first selected recipient's result for compatibility.
 - Department create/delete and other organization writes use the existing SuperAdmin and scoped-Admin boundaries. A department-scoped Admin can manage only departments explicitly in scope; creating a department requires scope over its faculty.
+- Faculty and department CSV data is included in `api/database/seeders/data/` and imported idempotently by `DatabaseSeeder`; departments retain their source category and reference the corresponding faculty row.
 - Inbox, sent, and draft lists use bounded pagination: default 20, maximum 100, with unread state and existing row fields retained.
 - Memo file uploads support PDF, PNG, and JPEG only. Word documents are rejected by both client and API; no Word conversion is provided. Uploaded files are deleted if the memo database transaction fails, and file access remains private and recipient-authorized.
 - Laravel migrations and the visibility queries execute on the configured SQLite test/local path. MySQL remains the documented production database; driver-specific visibility SQL is covered by a MySQL SQL-generation test. No PostgreSQL support is claimed.

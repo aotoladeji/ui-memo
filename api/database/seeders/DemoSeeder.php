@@ -11,11 +11,17 @@ class DemoSeeder extends Seeder
 {
     public function run(): void
     {
-        $sci = Faculty::create(['name' => 'Faculty of Science', 'code' => 'SCI']);
-        $adminFac = Faculty::create(['name' => 'Administration', 'code' => 'ADMIN']);
+        $sci = Faculty::firstOrCreate(['name' => 'Science'], ['code' => 'SCI']);
+        $adminFac = Faculty::firstOrCreate(['name' => 'Administration'], ['code' => 'ADMIN']);
 
-        $csc = Department::create(['faculty_id' => $sci->id, 'name' => 'Computer Science', 'code' => 'CSC', 'has_logo' => false]);
-        $central = Department::create(['faculty_id' => $adminFac->id, 'name' => 'Central Administration', 'code' => 'CENTRAL', 'has_logo' => false]);
+        $csc = Department::firstOrCreate(
+            ['faculty_id' => $sci->id, 'name' => 'Computer Science'],
+            ['code' => 'CSC', 'has_logo' => false],
+        );
+        $central = Department::firstOrCreate(
+            ['faculty_id' => $adminFac->id, 'name' => 'Central Administration'],
+            ['code' => 'CENTRAL', 'has_logo' => false],
+        );
 
         $registry = Unit::create(['department_id' => $central->id, 'name' => 'Registry', 'code' => 'REG']);
         $ict = Unit::create(['department_id' => $csc->id, 'name' => 'ICT Unit', 'code' => 'ICT']);

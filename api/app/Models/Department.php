@@ -15,6 +15,7 @@ class Department extends Model
         'faculty_id',
         'name',
         'code',
+        'dept_category',
         'has_logo',
         'logo_path',
     ];

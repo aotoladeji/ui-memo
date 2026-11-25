@@ -5,7 +5,7 @@ setup:  ## one-time: Laravel skeleton in ./api + web dependencies
 mysql:  ## create databases and user (needs MySQL running and its root password)
 	mysql -u root -p < scripts/create-databases.sql
 db:     ## create tables and demo data
-	cd api && php artisan migrate --force && php artisan db:seed --class=DemoSeeder --force
+	cd api && php artisan migrate --force && php artisan db:seed --class=DatabaseSeeder --force
 api:    ## http://localhost:8000
 	cd api && php artisan serve
 queue:  ## unit/global fan-out worker (needed for non-peer sends)
